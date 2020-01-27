@@ -5,8 +5,6 @@ from sympy.utilities.iterables import multiset_permutations
 import itertools
 import scipy.misc
 
-# Git Testing
-
 class SeedGenerator:
 
     def __init__(self, pattern_length, seed_length, n_symbols, n_hidden, n_output, time_per, allow_repeated_symbols = False, seed = 42):
