@@ -5,6 +5,7 @@ from sympy.utilities.iterables import multiset_permutations
 import itertools
 import scipy.misc
 
+# Git Testing
 
 class SeedGenerator:
 
@@ -50,11 +51,11 @@ class SeedGenerator:
 
         # Construct remainder of pattern for every seed
         if self.repeated_symbols:
-            patterns = np.random.choice(self.symbol_set, 
+            patterns = np.random.choice(self.symbol_set,
                                         size=reproduction_shape)
         else:
-            patterns = np.array([np.random.choice(self.symbol_set, 
-                                            size=self.pattern_length, 
+            patterns = np.array([np.random.choice(self.symbol_set,
+                                            size=self.pattern_length,
                                             replace=False) for i in range(batch_size)])
 
         # Come up with associated origin vectors (inputs)
@@ -72,4 +73,3 @@ class SeedGenerator:
         mask = np.ones((batch_size, self.n_output))
 
         return inputs, targets, mask
-
