@@ -132,7 +132,7 @@ def update_trial_params():
         par['allow_repeated_symbols'] = False
         par['show_patterns']          = False
         par['bank_overlap_pairwise']  = 0.0 # NOT YET FLESHED OUT
-        par['bank_overlap_total']     = 0.0 # NOT YET FLESHED OUT  
+        par['bank_overlap_total']     = 0.0 # NOT YET FLESHED OUT
         par['memory_banks']           = dict()
         par['memory_bank_id']         = 0
 
@@ -149,8 +149,8 @@ def update_trial_params():
         par['num_motion_tuned'] = par['n_input'] - par['num_fix_tuned']
 
         # Excitability parameters: long timescale
-        par['t_since_update']      = 0 
-        par['excitability_period'] = 0 
+        par['t_since_update']      = 0
+        par['excitability_period'] = 0
         par['dyn_rng_long']        = [0.25, 2]
         par['long_phases']         = np.zeros((par['n_hidden']))
 
@@ -391,7 +391,7 @@ def update_dependencies():
             par['U'][0,i] = 0.15
             par['syn_u_init'][:, i] = par['U'][0,i]
             par['dynamic_synapse'][0,i] = 1
-            
+
         elif synaptic_configurations[par['synapse_config']][i] == 'depressing':
             par['alpha_stf'][0,i] = par['dt']/par['tau_fast']
             par['alpha_std'][0,i] = par['dt']/par['tau_slow']
@@ -411,7 +411,7 @@ def update_dependencies():
         exc_groups = np.tile(np.arange(par['granularity']), par['num_exc_units'] // par['granularity'])
         inh_groups = np.tile(np.arange(par['granularity']), par['num_inh_units'] // par['granularity'])
         par['total_groups'] = np.hstack((exc_groups, inh_groups))
-        
+
         # Generate states
         par['exc_states'] = np.array([par['exc_values'][(par['memory_bank_id'] + i) % par['granularity']] for i in par['total_groups']])
 
@@ -429,8 +429,3 @@ update_trial_params()
 update_dependencies()
 
 print("--> Parameters successfully loaded.\n")
-
-
-
-
-

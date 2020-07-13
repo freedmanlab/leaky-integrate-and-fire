@@ -1,4 +1,5 @@
 ## Author: Matt Rosen (2020); modified from Masse/Grant
+## Modified: Antony Simonoff (2020)
 
 import numpy as np
 import tensorflow as tf
@@ -34,7 +35,6 @@ class BehaviorModule:
             with tf.device(device):
                 behavior_generator = self.model(input_data, target_data, mask)
 
-            #print(0/0)
             sess.run(tf.global_variables_initializer())
             t_start = time.time()
 
@@ -45,7 +45,7 @@ class BehaviorModule:
             # Train LSTM part of the network to produce the sequences
             for i in range(par['n_train_batches_lstm']):
 
-                x, y, m = s.make_batch(self.batch_size) 
+                x, y, m = s.make_batch(self.batch_size)
 
                 _, loss, pred_y  = sess.run([self.train_op, self.loss, self.y], feed_dict={input_data: x, target_data: y, mask: m})
                 losses.append(loss)
@@ -95,7 +95,7 @@ class BehaviorModule:
 
         self.y = []
 
-        h = self.var_dict['h']#tf.zeros_like(par['h0'])
+        h = self.var_dict['h']
         c = tf.zeros_like(par['h0'])
 
         for t in range(self.target_data.shape[0]):
@@ -106,14 +106,12 @@ class BehaviorModule:
                 h, c = self.lstm(tf.zeros_like(self.input_data), h, c)
             self.y.append(tf.squeeze(h @ tf.nn.relu(self.var_dict['w_out']) + self.var_dict['b_out'] - (1 - self.mask)*1e16))
 
-        # Stack results together 
+        # Stack results together
         self.y = tf.stack(self.y)
 
     def lstm(self, rnn_input, h, c):
         # Update neural activity and short-term synaptic plasticity values
-        #print_dict = {'h': h, 'rnn_input': rnn_input, 'Wf':self.var_dict['Wf'], 'Uf': self.var_dict['Uf'], 'bf': self.var_dict['bf']}
-        #for k, v in print_dict.items():
-        #    print(k, v.shape)
+
         f  = tf.sigmoid(rnn_input @ self.var_dict['Wf'] + h @ self.var_dict['Uf'] + self.var_dict['bf'])
         i  = tf.sigmoid(rnn_input @ self.var_dict['Wi'] + h @ self.var_dict['Ui'] + self.var_dict['bi'])
         cn = tf.tanh(rnn_input @ self.var_dict['Wc'] + h @ self.var_dict['Uc'] + self.var_dict['bc'])
@@ -133,14 +131,14 @@ class BehaviorModule:
 
         opt = tf.train.AdamOptimizer(learning_rate = par['learning_rate'])
         self.train_op = opt.minimize(self.loss)
-        
+
 
 if __name__ == "__main__":
-    update_parameters({'trial_type'     : 'SR', 
-                       'excitability'   : True,
+    update_parameters({'trial_type'     : 'SR',
+                       # 'excitability'   : True,
+                       'leakyintegratefire' : True,
                        'n_train_batches_lstm': 5000,
                        'learning_rate': 0.01})
     bm = BehaviorModule(sys.argv[1])
 
     print("Done")
-

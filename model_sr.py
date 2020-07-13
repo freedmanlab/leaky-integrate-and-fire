@@ -163,6 +163,8 @@ class Model:
                 + par['alpha_neuron'] * par['exc_states']*(rnn_input @ tf.nn.relu(self.var_dict['w_in']) \
                 + h_post @ self.w_rnn + self.var_dict['b_rnn']) \
                 + tf.random_normal(h.shape, 0, par['noise_rnn'], dtype=tf.float32))
+        if par['leakyintegratefire']:
+            h = 
         else:
             h = tf.nn.relu(h * (1-par['alpha_neuron']) \
                 + par['alpha_neuron'] * (rnn_input @ tf.nn.relu(self.var_dict['w_in']) \

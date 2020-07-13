@@ -1,7 +1,7 @@
 import numpy as np
 import tensorflow as tf
 import os
-import matplotlib as mpl 
+import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
 
@@ -34,8 +34,12 @@ par = {
     'output_bottleneck'     : None, # None, or float in [0, 1.) [default: 0.1]
     'output_ei_balance'     : None, # None, or float in [0, 1.) [default: 0.5]
 
-    # Excitability 
+    # Excitability
     'excitability'          : False,
+
+    # Leaky, integrate, and fire
+    'leakyintegratefire'    : True,
+    'membrane_resistance'   : True,
 
     # High-throughput
     'high_throughput'       : True,
@@ -129,7 +133,7 @@ def sprinkle_toppings(update):
         par['output_bottleneck'] = 0.1
         par['input_ei_balance']  = 0.5
         par['output_ei_balance'] = 1.0
-        
+
 def check_toppings():
 
     # First: if multi-module is on, bottlenecks must be, too
@@ -173,7 +177,7 @@ def update_trial_params():
         par['allow_repeated_symbols'] = False
         par['show_patterns']          = False
         par['bank_overlap_pairwise']  = 0.0 # NOT YET FLESHED OUT
-        par['bank_overlap_total']     = 0.0 # NOT YET FLESHED OUT  
+        par['bank_overlap_total']     = 0.0 # NOT YET FLESHED OUT
         par['memory_banks']           = dict()
         par['memory_bank_id']         = 0
 
@@ -190,8 +194,8 @@ def update_trial_params():
         par['num_motion_tuned'] = par['n_input'] - par['num_fix_tuned']
 
         # Excitability parameters: long timescale
-        par['t_since_update']      = 0 
-        par['excitability_period'] = 0 
+        par['t_since_update']      = 0
+        par['excitability_period'] = 0
         par['dyn_rng_long']        = [0.25, 2]
         par['long_phases']         = np.zeros((par['n_hidden']))
 
@@ -380,13 +384,13 @@ def update_dependencies():
     else:
         par['w_in0'] = initialize([par['n_networks'], par['n_input'], par['n_hidden']], par['connection_prob']/par['num_receptive_fields'], shape=0.2, scale=1.)
     if par['input_bottleneck'] is not None: # NOTE: if input bottleneck is enabled, make it high-throughput
-        # Units to shut off 
+        # Units to shut off
         n_receivers = int(par['input_bottleneck'] * par['n_hidden'])
         first_receiver = par['num_exc_units'] - int(par['input_ei_balance'] * n_receivers)
         off_inds = list(range(0, first_receiver))
         off_inds.extend(list(range(first_receiver + n_receivers, par['n_hidden'])))
         #off_inds = list(range(0, par['num_exc_units'] - 20))
-        #off_inds.extend(list(range(par['num_exc_units'] + 20, par['n_hidden']))) 
+        #off_inds.extend(list(range(par['num_exc_units'] + 20, par['n_hidden'])))
         par['w_in0'][:,:,off_inds] = 0
 
         # New initialization
@@ -439,7 +443,7 @@ def update_dependencies():
         module_2_direct = list(range(first_projector, last_projector))
         module_2_indirect = [list(range(last_projector, par['num_exc_units'] // 2))]
         module_2_indirect.append(list(range(module_1_indirect[1][-1] + 1, par['n_hidden'])))
-        
+
         module_1_inh = list(range(par['num_exc_units'], par['num_exc_units'] + par['num_inh_units'] // 2))
         module_2_inh = list(range(par['num_exc_units'] + par['num_inh_units'] // 2, par['n_hidden']))
         '''print(module_1_inh)
@@ -489,7 +493,7 @@ def update_dependencies():
         m1_indir = initialize([par['n_networks'], sum([len(i) for i in module_1_indirect]), sum([len(i) for i in module_1_indirect])], par['connection_prob'])
         m2_indir = initialize([par['n_networks'], sum([len(i) for i in module_2_indirect]), sum([len(i) for i in module_2_indirect])], par['connection_prob'])
         m2_dir = initialize([par['n_networks'], len(module_2_direct), len(module_2_direct)], par['connection_prob'])
-        
+
         # 4a. Direct-to-direct
         par['w_rnn0'][:, module_1_direct[0]:module_1_direct[-1] + 1, module_1_direct[0]:module_1_direct[-1] + 1] = m1_dir
         par['w_rnn0'][:, module_2_direct[0]:module_2_direct[-1] + 1, module_2_direct[0]:module_2_direct[-1] + 1] = m2_dir
@@ -507,7 +511,7 @@ def update_dependencies():
 
         #par['w_rnn0'][:, module_1_indirect[0][0]:module_1_indirect[0][-1], module_1_indirect[i][0]:module_1_indirect[i][-1]] = m1_indir[:, 0:len(module_1_indirect[0]), 0:len(module_1_indirect[0])]
         #par['w_rnn0'][:, module_2_indirect[0][0]:module_2_indirect[0][-1], module_2_indirect[i][0]:module_2_indirect[i][-1]] = m2_indir[:, 0:len(module_2_indirect[0]), 0:len(module_2_indirect[0])]
-        
+
         #par['w_rnn0'][:, module_1_indirect[i][0]:module_1_indirect[i][-1], module_1_indirect[i][0]:module_1_indirect[i][-1]] = m1_indir[:, 0:len(module_1_indirect[0]), 0:len(module_1_indirect[0])]
         #par['w_rnn0'][:, module_2_indirect[i][0]:module_2_indirect[i][-1], module_2_indirect[i][0]:module_2_indirect[i][-1]] = m2_indir[:, 0:len(module_2_indirect[0]), 0:len(module_2_indirect[0])]
 
@@ -696,7 +700,7 @@ def update_dependencies():
         #if par['memory_bank_id'] == 1:
         #    print(0/0)
         #print(par['total_groups'])
-        
+
         # Generate states
         par['exc_states'] = np.array([par['exc_values'][(par['memory_bank_id'] + i) % par['granularity']] for i in par['total_groups']])
 
