@@ -7,7 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import random
-from tqdm.notebook import tqdm
+# from tqdm.notebook import tqdm
 from parameters_lif import par, update_dependencies
 # %matplotlib inline
 
@@ -137,9 +137,12 @@ class LIFNeuron():
             input()
         else:
             self.exc = np.hstack((self.exc, exc))
-            self.Vm = np.append(self.Vm, Vm)
-            self.spikes = np.append(self.spikes, spikes)
-            self.time = np.append(self.time, time)
+            self.V_m = V_m
+            self.spikes = spikes
+            self.time = time
+            # self.Vm = np.append(self.Vm, Vm)
+            # self.spikes = np.append(self.spikes, spikes)
+            # self.time = np.append(self.time, time)
 
         if self.debug:
             print ('LIFNeuron.spike_generator.exit_state(V_m={} at iteration i={}, time={})'
@@ -173,8 +176,9 @@ neurons = create_neurons(num_layers, num_neurons, debug=False,
 # Run stimuli for each neuron in layer 0
 stimulus_len = len(neuron_input)
 layer = 0
-for neuron in tqdm(np.arange(1)):
-    offset = random.randint(0,, time)   # Simulates stimulus starting at different times
+# for neuron in tqdm(np.arange(1)):
+for neuron in range(num_neurons):
+    offset = random.randint(0, time)   # Simulates stimulus starting at different times
     stimulus = np.zeros_like(neuron_input)
     stimulus[offset:stimulus_len] = neuron_input[0:stimulus_len - offset]
     neurons[layer][neuron].spike_generator(stimulus)
