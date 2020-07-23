@@ -15,7 +15,7 @@ par = {
 
     ##################
     # Leaky intergrate and fire parameters
-    'T'                     : 50,       # total time to sumulate (msec)
+    'T'                     : 1,       # total time to sumulate (msec)
     'simulation_dt'         : 0.0125,   # Simulation timestep
     'inpt'                  : 1.0,      # Neuron input voltage
 
@@ -32,8 +32,8 @@ par = {
     'debug'                 : False,    # Watch neurons get made
 
     # Network shape
-    'num_layers'            : 4,
-    'num_neurons'           : 1024,
+    'num_layers'            : 2,
+    'num_neurons'           : 5,
 }
 
 def update_parameters(updates):
