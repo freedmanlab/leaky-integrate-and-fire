@@ -38,7 +38,7 @@ par = {
     'exc_func'              : default_exc_func, #excitability function
     # Network shape
     'num_layers'            : 2,
-    'num_neurons'           : 5,
+    'num_neurons'           : 15,
 }
 
 def update_parameters(updates):
