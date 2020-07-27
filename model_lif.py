@@ -54,7 +54,7 @@ class LIFNeuron():
 
         #LIF Properties
         self.exc      = np.zeros((4,1))  # Resting potential (mV?), threshold (mV?), refractory period (ms), gain (unitless)
-        self.V_m       = np.zeros(1)    # Neuron potential (mV)
+        self.V_m      = np.zeros(1)    # Neuron potential (mV)
         self.time     = np.zeros(1)    # Time duration for the neuron (needed?)
         self.spikes   = np.zeros(1)    # Output (spikes) for the neuron
 
@@ -116,10 +116,6 @@ class LIFNeuron():
                                 V_m[:i], spikes[:i], neuron_input[:i], exc[:,:i])
                 V_m[i] = exc[0,i]
 
-
-
-
-
             self.t += self.dt
 
         # Save state
@@ -178,28 +174,34 @@ def create_neurons(num_layers, num_neurons, debug=False, **specific_params):
 neurons = create_neurons(num_layers, num_neurons, debug=False,
             V_rest=-.5, exc_func = exc_func)
 
-# Run stimuli for each neuron in layer 0
-stimulus_len = len(neuron_input)
-layer = 0
-
-for neuron in range(num_neurons):
-    offset = random.randint(0, time)   # Simulates stimulus starting at different times
-    stimulus = np.zeros_like(neuron_input)
-    stimulus[offset:stimulus_len] = neuron_input[0:stimulus_len - offset]
-    neurons[layer][neuron].spike_generator(stimulus)
-
 # Simulate spike propagation through layers
-for layer in np.arange(1, num_layers):
+for layer in np.arange(num_layers):
     if layer == 0: # Sum spikes in layer 0
+        # Run stimuli for each neuron in layer 0
+        stimulus_len = len(neuron_input)
+        for neuron in range(num_neurons):
+            offset = random.randint(0, time)   # Simulates stimulus starting at different times
+            stimulus = np.zeros_like(neuron_input)
+            stimulus[offset:stimulus_len] = neuron_input[0:stimulus_len - offset]
+            neurons[layer][neuron].spike_generator(stimulus)
+
         layer_spikes = np.zeros_like(neurons[layer][0].spikes)
         for neuron in np.arange(num_neurons):
             layer_spikes += neurons[layer][neuron].spikes
+
     else:
-        layer_spikes = np.zeros_like(neurons[layer][0].spikes)
-        for neuron in np.arange(num_neurons):
+        layer_spikes = np.zeros_like(neurons[layer-1][0].spikes)
+        print("a")
+        print(layer_spikes)
+        print(np.shape(layer_spikes))
+        # input()
+        for neuron in range(num_neurons):
             neurons[layer][neuron].spike_generator(layer_spikes)
-        for neuron in np.arange(num_neurons):
             layer_spikes += neurons[layer][neuron].spikes
+        print("b")
+        print(layer_spikes)
+        print(np.shape(layer_spikes))
+        # input()
 
     start_time = 0
     end_time = time
@@ -209,8 +211,14 @@ for layer in np.arange(1, num_layers):
     fig, axs = plt.subplots(num_layers)
     colors = ['C{}'.format(i) for i in range(num_layers)]
 
+    print("c")
+    print(layer_spikes)
+    print(np.shape(layer_spikes))
+    # input()
+
     axs[layer].eventplot(layer_spikes, orientation='horizontal', linelengths=1.5)
-    plt.show()
+
+plt.show()
 
     # Graph results
     # plot_spikes(neurons[layer][0].time[start_time:end_time], layer_spikes[start_time:end_time],

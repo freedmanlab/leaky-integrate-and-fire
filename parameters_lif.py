@@ -19,7 +19,7 @@ par = {
 
     ##################
     # Leaky intergrate and fire parameters
-    'T'                     : 50.0,       # total time to sumulate (ms)
+    'T'                     : 5.0,       # total time to sumulate (ms)
     'simulation_dt'         : 0.0125,   # Simulation timestep
     'inpt'                  : 1.0,      # Neuron input voltage
 
@@ -30,7 +30,7 @@ par = {
     'Rm'                    : 1.0,        # Resistance (kOhm)
     'Cm'                    : 10,       # Capacitance (uF)
     'tau_ref'               : 10.0,        # refractory period (ms)
-    'V_th'                  : 0.75,     # : 1  #spike threshold
+    'V_th'                  : 0.1,     # : 1  #spike threshold
     'V_spike'               : 1.0,        # spike delta (V)
     'V_rest'                : 0.0,        # resting potential (V)
     'type'                  : 'Leaky Integrate and Fire',
@@ -38,7 +38,7 @@ par = {
     'exc_func'              : default_exc_func, #excitability function
     # Network shape
     'num_layers'            : 2,
-    'num_neurons'           : 15,
+    'num_neurons'           : 100,
 }
 
 def update_parameters(updates):
