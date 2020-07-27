@@ -7,6 +7,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import pandas as pd
 import random
+import matplotlib
 # from tqdm.notebook import tqdm
 from parameters_lif import par, update_dependencies
 # %matplotlib inline
@@ -21,10 +22,9 @@ neuron_input[500:2000] = 1.25 #par['neuron_input']
 num_layers  = par['num_layers']
 num_neurons = par['num_neurons']
 
-print("hi")
 # Graphing functions:
 def plot_neuron_behaviour(time, data, neuron_type, neuron_id, y_title):
-    #print ('Drawing graph with time.shape={}, data.shape={}'.format(time.shape, data.shape))
+    # print ('Drawing graph with time.shape={}, data.shape={}'.format(time.shape, data.shape))
     plt.plot(time,data)
     plt.title('{0} @ {1}'.format(neuron_type, neuron_id))
     plt.ylabel(y_title)
@@ -188,37 +188,34 @@ for neuron in range(num_neurons):
     stimulus[offset:stimulus_len] = neuron_input[0:stimulus_len - offset]
     neurons[layer][neuron].spike_generator(stimulus)
 
-# Graph for neuron in layer 0
-# plot_membrane_potential(neurons[0][0].time, neurons[0][0].V_m, 'Membrane Potential {}'.format(neurons[0][0].type), neuron_id = "0/0")
-# plot_spikes(neurons[0][0].time, neurons[0][0].spikes, 'Output spikes for {}'.format(neurons[0][0].type), neuron_id = "0/0")
-
-#Sum spikes for layer 0
-layer = 0
-layer_spikes = np.zeros_like(neurons[layer][0].spikes)
-for neuron in np.arange(num_neurons):
-    layer_spikes += neurons[layer][neuron].spikes
-
-# Graph spikes for layer 0
-plot_spikes(neurons[0][0].time, layer_spikes, 'Output spikes for layer {}'.format(layer))
-
 # Simulate spike propagation through layers
-for layer in np.arange(1,num_layers):
-    for neuron in np.arange(num_neurons):
-        neurons[layer][neuron].spike_generator(layer_spikes)
-    layer_spikes = np.zeros_like(neurons[layer][0].spikes)
-    for neuron in np.arange(num_neurons):
-        layer_spikes += neurons[layer][neuron].spikes
-
-
+for layer in np.arange(1, num_layers):
+    if layer == 0: # Sum spikes in layer 0
+        layer_spikes = np.zeros_like(neurons[layer][0].spikes)
+        for neuron in np.arange(num_neurons):
+            layer_spikes += neurons[layer][neuron].spikes
+    else:
+        layer_spikes = np.zeros_like(neurons[layer][0].spikes)
+        for neuron in np.arange(num_neurons):
+            neurons[layer][neuron].spike_generator(layer_spikes)
+        for neuron in np.arange(num_neurons):
+            layer_spikes += neurons[layer][neuron].spikes
 
     start_time = 0
-    end_time = len(neurons[1][0].time)
+    end_time = time
     print('Rendering neurons[{}][0] over the time period {}:{}'.format(layer, start_time, end_time))
 
+    # Raster plots:
+    fig, axs = plt.subplots(num_layers)
+    colors = ['C{}'.format(i) for i in range(num_layers)]
+
+    axs[layer].eventplot(layer_spikes, orientation='horizontal', linelengths=1.5)
+    plt.show()
+
     # Graph results
-    plot_spikes(neurons[layer][0].time[start_time:end_time], layer_spikes[start_time:end_time],
-                'Input Spikes for {}'.format(neurons[layer][0].type), neuron_id = "{}/0".format(layer))
-    plot_membrane_potential(neurons[layer][0].time[start_time:end_time], neurons[layer][0].V_m[start_time:end_time],
-                'Membrane Potential {}'.format(neurons[layer][0].type), neuron_id = "{}/0".format(layer))
-    plot_spikes(neurons[layer][0].time[start_time:end_time], neurons[layer][0].spikes[start_time:end_time],
-                'Output spikes for {}'.format(neurons[layer][0].type), neuron_id = "{}/0".format(layer))
+    # plot_spikes(neurons[layer][0].time[start_time:end_time], layer_spikes[start_time:end_time],
+    #             'Input Spikes for {}'.format(neurons[layer][0].type), neuron_id = "{}/0".format(layer))
+    # plot_membrane_potential(neurons[layer][0].time[start_time:end_time], neurons[layer][0].V_m[start_time:end_time],
+    #             'Membrane Potential {}'.format(neurons[layer][0].type), neuron_id = "{}/0".format(layer))
+    # plot_spikes(neurons[layer][0].time[start_time:end_time], neurons[layer][0].spikes[start_time:end_time],
+    #             'Output spikes for {}'.format(neurons[layer][0].type), neuron_id = "{}/0".format(layer))
