@@ -30,7 +30,7 @@ def plot_neuron_behaviour(time, data, neuron_type, neuron_id, y_title):
     plt.ylabel(y_title)
     plt.xlabel('Time (msec)')
 
-    # Graph to the data with some headroom...
+    # Graph to the data with some headroom
     y_min = min(data)*1.2
     y_max = max(data)*1.2
     if y_max == 0:
@@ -119,31 +119,17 @@ class LIFNeuron():
             self.t += self.dt
 
         # Save state
-        if self.debug:
-            self.exc = np.hstack((self.exc, exc))
-            print("self.V_m")
-            print(np.shape(self.V_m))
-            self.V_m = np.append(self.V_m, V_m)
-            print(np.shape(self.V_m))
-            print(np.shape(self.spikes))
-            self.spikes = np.append(self.spikes, spikes)
-            print(np.shape(self.spikes))
-            print(np.shape(self.time))
-            self.time = np.append(self.time, time)
-            print(np.shape(self.time))
-            input()
+        # if the first time spikes are being generated
+        if self.spikes.shape[0] == 1:
+            self.spikes = spikes
+            self.exc = exc
+            self.V_m = V_m
+            self.time = time
         else:
-            #if it's the first time spikes are being generated
-            if self.spikes.shape[0] == 1:
-                self.spikes = spikes
-                self.exc = exc
-                self.V_m = V_m
-                self.time = time
-            else:
-                self.exc = np.hstack((self.exc, exc))
-                self.V_m = np.append(self.V_m, V_m)
-                self.spikes = np.append(self.spikes, spikes)
-                self.time = np.append(self.time, time)
+            self.exc = np.hstack((self.exc, exc))
+            self.V_m = np.append(self.V_m, V_m)
+            self.spikes = np.append(self.spikes, spikes)
+            self.time = np.append(self.time, time)
 
         if self.debug:
             print ('LIFNeuron.spike_generator.exit_state(V_m={} at iteration i={}, time={})'
@@ -181,7 +167,7 @@ for layer in np.arange(num_layers):
         stimulus_len = len(neuron_input)
         for neuron in range(num_neurons):
             offset = random.randint(0, time)   # Simulates stimulus starting at different times
-            stimulus = np.zeros_like(neuron_input)
+            stimulus = np.ones_like(neuron_input)
             stimulus[offset:stimulus_len] = neuron_input[0:stimulus_len - offset]
             neurons[layer][neuron].spike_generator(stimulus)
 
@@ -191,10 +177,6 @@ for layer in np.arange(num_layers):
 
     else:
         layer_spikes = np.zeros_like(neurons[layer-1][0].spikes)
-        print("a")
-        print(layer_spikes)
-        print(np.shape(layer_spikes))
-        # input()
         for neuron in range(num_neurons):
             neurons[layer][neuron].spike_generator(layer_spikes)
             layer_spikes += neurons[layer][neuron].spikes
@@ -218,12 +200,12 @@ for layer in np.arange(num_layers):
 
     axs[layer].eventplot(layer_spikes, orientation='horizontal', linelengths=1.5)
 
-plt.show()
+    plt.show()
 
     # Graph results
-    # plot_spikes(neurons[layer][0].time[start_time:end_time], layer_spikes[start_time:end_time],
-    #             'Input Spikes for {}'.format(neurons[layer][0].type), neuron_id = "{}/0".format(layer))
-    # plot_membrane_potential(neurons[layer][0].time[start_time:end_time], neurons[layer][0].V_m[start_time:end_time],
-    #             'Membrane Potential {}'.format(neurons[layer][0].type), neuron_id = "{}/0".format(layer))
-    # plot_spikes(neurons[layer][0].time[start_time:end_time], neurons[layer][0].spikes[start_time:end_time],
-    #             'Output spikes for {}'.format(neurons[layer][0].type), neuron_id = "{}/0".format(layer))
+    plot_spikes(neurons[layer][0].time[start_time:end_time], layer_spikes[start_time:end_time],
+    'Input Spikes for {}'.format(neurons[layer][0].type), neuron_id = "{}/0".format(layer))
+    plot_membrane_potential(neurons[layer][0].time[start_time:end_time], neurons[layer][0].V_m[start_time:end_time],
+    'Membrane Potential {}'.format(neurons[layer][0].type), neuron_id = "{}/0".format(layer))
+    plot_spikes(neurons[layer][0].time[start_time:end_time], neurons[layer][0].spikes[start_time:end_time],
+    'Output spikes for {}'.format(neurons[layer][0].type), neuron_id = "{}/0".format(layer))

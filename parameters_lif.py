@@ -30,7 +30,7 @@ par = {
     'Rm'                    : 1.0,        # Resistance (kOhm)
     'Cm'                    : 10,       # Capacitance (uF)
     'tau_ref'               : 10.0,        # refractory period (ms)
-    'V_th'                  : 0.1,     # : 1  #spike threshold
+    'V_th'                  : 0.5,     # : 1  #spike threshold
     'V_spike'               : 1.0,        # spike delta (V)
     'V_rest'                : 0.0,        # resting potential (V)
     'type'                  : 'Leaky Integrate and Fire',
