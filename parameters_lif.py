@@ -24,7 +24,7 @@ par = {
     'inpt'                  : 1.0,      # Neuron input voltage
 
     'gain'                  : 1.0,      # neuron gain (unitless)
-    't_rest'                : 0.0,        # initial refractory time
+    't_rest'                : 0.05,        # initial refractory time
     't'                     : 0.0,        # Neuron time step
     'neuron_dt'             : 0.125,    # Neuron dt
     'Rm'                    : 1.0,        # Resistance (kOhm)

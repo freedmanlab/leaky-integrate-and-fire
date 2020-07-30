@@ -25,17 +25,27 @@ num_neurons = par['num_neurons']
 # Graphing functions:
 def plot_neuron_behaviour(time, data, neuron_type, neuron_id, y_title):
     # print ('Drawing graph with time.shape={}, data.shape={}'.format(time.shape, data.shape))
-    plt.plot(time,data)
+    plt.plot(time, data)
     plt.title('{0} @ {1}'.format(neuron_type, neuron_id))
     plt.ylabel(y_title)
     plt.xlabel('Time (msec)')
 
-    # Graph to the data with some headroom
-    y_min = min(data)*1.2
-    y_max = max(data)*1.2
-    if y_max == 0:
+    # Graph the data with some headroom
+    if min(data) < 0:
+        y_min = min(data)*1.2
+    elif min(data) == 0:
+        y_min = -1
+    elif min(data) > 0:
+        y_min = min(data)*0.8
+
+    if max(data) < 0:
+        y_max = max(data)*0.8
+    elif max(data) == 0:
         y_max = 1
-    plt.ylim([y_min,y_max])
+    elif max(data) > 0:
+        y_max = max(data)*1.2
+
+    plt.ylim([y_min, y_max])
     plt.show()
 
 def plot_membrane_potential(time, V_m, neuron_type, neuron_id = 0):
@@ -45,7 +55,6 @@ def plot_spikes(time, V_m, neuron_type, neuron_id = 0):
     plot_neuron_behaviour(time, V_m, neuron_type, neuron_id, y_title = 'Spike (V)')
 
 # Basic LIF Neuron class
-
 class LIFNeuron():
     def __init__(self, debug=True, **specific_params):
         # Simulation config (may not all be needed!!)
@@ -77,7 +86,7 @@ class LIFNeuron():
         # Create local arrays for this run
         duration = len(neuron_input)
         V_m = np.full(duration, self.V_rest) #len(time)) # potential (V) trace over time
-        exc = np.full((4,duration), self.V_rest)
+        exc = np.full((4, duration), self.V_rest)
         exc[1, :] = self.V_th
         exc[2, :] = self.tau_ref
         exc[3, :] = self.gain
@@ -109,8 +118,7 @@ class LIFNeuron():
                     spikes[i] += self.V_spike
                     self.t_rest = self.t + exc[2,i]
                     if self.debug:
-                        print ('*** LIFNeuron.spike_generator.spike=(self.t_rest={}, self.t={}, self.tau_ref={})'
-                           .format(self.t_rest, self.t, self.tau_ref))
+                        print ('*** LIFNeuron.spike_generator.spike=(self.t_rest={}, self.t={}, self.tau_ref={})'.format(self.t_rest, self.t, self.tau_ref))
             else:
                 exc[:, i] = self.exc_func(self.V_rest, self.V_th, self.tau_ref, self.gain,
                                 V_m[:i], spikes[:i], neuron_input[:i], exc[:,:i])
@@ -161,49 +169,47 @@ neurons = create_neurons(num_layers, num_neurons, debug=False,
             V_rest=-.5, exc_func = exc_func)
 
 # Simulate spike propagation through layers
+layer_spikes = []
 for layer in np.arange(num_layers):
     if layer == 0: # Sum spikes in layer 0
         # Run stimuli for each neuron in layer 0
         stimulus_len = len(neuron_input)
-        for neuron in range(num_neurons):
+        for neuron in np.arange(num_neurons):
+            random.seed(42) # Set seed for reproduction
             offset = random.randint(0, time)   # Simulates stimulus starting at different times
             stimulus = np.ones_like(neuron_input)
             stimulus[offset:stimulus_len] = neuron_input[0:stimulus_len - offset]
             neurons[layer][neuron].spike_generator(stimulus)
 
-        layer_spikes = np.zeros_like(neurons[layer][0].spikes)
+        # Break up for loops so neurons[..].spikes is created
+        layer_spikes.append(np.zeros_like(neurons[layer][0].spikes))
         for neuron in np.arange(num_neurons):
-            layer_spikes += neurons[layer][neuron].spikes
+            layer_spikes[layer] += neurons[layer][neuron].spikes
 
     else:
-        layer_spikes = np.zeros_like(neurons[layer-1][0].spikes)
-        for neuron in range(num_neurons):
-            neurons[layer][neuron].spike_generator(layer_spikes)
-            layer_spikes += neurons[layer][neuron].spikes
+        layer_spikes.append(np.zeros_like(neurons[layer-1][0].spikes))
+        for neuron in np.arange(num_neurons):
+            neurons[layer][neuron].spike_generator(layer_spikes[layer])
+            layer_spikes[layer] += neurons[layer][neuron].spikes
         print("b")
-        print(layer_spikes)
-        print(np.shape(layer_spikes))
+        print(layer_spikes[layer])
+        print(np.shape(layer_spikes[layer]))
         # input()
 
     start_time = 0
     end_time = time
-    print('Rendering neurons[{}][0] over the time period {}:{}'.format(layer, start_time, end_time))
+    print('Rendering neurons[{}][0] over the time period {}:{} ms'.format(layer, start_time, end_time))
 
     # Raster plots:
     fig, axs = plt.subplots(num_layers)
     colors = ['C{}'.format(i) for i in range(num_layers)]
-
-    print("c")
-    print(layer_spikes)
-    print(np.shape(layer_spikes))
-    # input()
 
     axs[layer].eventplot(layer_spikes, orientation='horizontal', linelengths=1.5)
 
     plt.show()
 
     # Graph results
-    plot_spikes(neurons[layer][0].time[start_time:end_time], layer_spikes[start_time:end_time],
+    plot_spikes(neurons[layer][0].time[start_time:end_time], layer_spikes[layer][start_time:end_time],
     'Input Spikes for {}'.format(neurons[layer][0].type), neuron_id = "{}/0".format(layer))
     plot_membrane_potential(neurons[layer][0].time[start_time:end_time], neurons[layer][0].V_m[start_time:end_time],
     'Membrane Potential {}'.format(neurons[layer][0].type), neuron_id = "{}/0".format(layer))
