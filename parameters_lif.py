@@ -39,6 +39,7 @@ par = {
     # Network shape
     'num_layers'            : 2,
     'num_neurons'           : 100,
+    'neuron_connections'    : 3,
 }
 
 def update_parameters(updates):

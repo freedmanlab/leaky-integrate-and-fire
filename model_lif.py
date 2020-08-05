@@ -12,6 +12,10 @@ import matplotlib
 from parameters_lif import par, update_dependencies
 # %matplotlib inline
 
+# Set seeds for reproduction
+random.seed(42)
+np.random.seed(42)
+
 T           = par['T']    # total time to sumulate (msec)
 dt          = par['simulation_dt'] # Simulation timestep
 time        = par['time']
@@ -21,6 +25,7 @@ neuron_input[500:2000] = 1.25 #par['neuron_input']
 
 num_layers  = par['num_layers']
 num_neurons = par['num_neurons']
+neuron_connections = par['neuron_connections']
 
 # Graphing functions:
 def plot_neuron_behaviour(time, data, neuron_type, neuron_id, y_title):
@@ -49,15 +54,15 @@ def plot_neuron_behaviour(time, data, neuron_type, neuron_id, y_title):
     plt.show()
 
 def plot_membrane_potential(time, V_m, neuron_type, neuron_id = 0):
-    plot_neuron_behaviour(time, V_m, neuron_type, neuron_id, y_title = 'Membrane potential (V)')
+    plot_neuron_behaviour(time, V_m, neuron_type, neuron_id, y_title = 'Membrane potential (mV)')
 
 def plot_spikes(time, V_m, neuron_type, neuron_id = 0):
-    plot_neuron_behaviour(time, V_m, neuron_type, neuron_id, y_title = 'Spike (V)')
+    plot_neuron_behaviour(time, V_m, neuron_type, neuron_id, y_title = 'Spike (mV)')
 
 # Basic LIF Neuron class
 class LIFNeuron():
     def __init__(self, debug=True, **specific_params):
-        # Simulation config (may not all be needed!!)
+        # Simulation config (may not all be needed!)
         self.dt       = par['neuron_dt']       # neuronal time step
         self.t_rest   = par['t_rest']           # initial refractory time
 
@@ -67,17 +72,17 @@ class LIFNeuron():
         self.time     = np.zeros(1)    # Time duration for the neuron (needed?)
         self.spikes   = np.zeros(1)    # Output (spikes) for the neuron
 
-        self.gain     = par['gain']      # neuron gain (unitless)
-        self.t        = par['t']         # Neuron time step
-        self.Rm       = par['Rm']        # Resistance (kOhm)
-        self.Cm       = par['Cm']        # Capacitance (uF)
-        self.tau_m    = par['tau_m']     # Time constant (ms)
-        self.tau_ref  = par['tau_ref']   # refractory period (ms)
-        self.V_th     = par['V_th']      # = 1  #spike threshold
-        self.V_spike  = par['V_spike']   # spike delta (V)
-        self.V_rest   = specific_params.get("V_rest", par['V_rest'])    # resting potential (V)
-        self.type     = par['type']
-        self.debug    = par['debug']
+        self.gain     = specific_params.get("gain", par["gain"])      # neuron gain (unitless)
+        self.t        = specific_params.get("t", par["t"])          # Neuron time step
+        self.Rm       = specific_params.get("Rm", par["Rm"])        # Resistance (kOhm)
+        self.Cm       = specific_params.get("Cm", par["Cm"])        # Capacitance (uF)
+        self.tau_m    = specific_params.get("tau_m", par["tau_m"])     # Time constant (ms)
+        self.tau_ref  = specific_params.get("tau_ref", par["tau_ref"])   # refractory period (ms)
+        self.V_th     = specific_params.get("V_th", par["V_th"])       # spike threshold (mV)
+        self.V_spike  = specific_params.get("V_spike", par["V_spike"])   # spike delta (mV)
+        self.V_rest   = specific_params.get("V_rest", par['V_rest'])    # resting potential (mV)
+        self.type     = specific_params.get("type", par["type"]
+        self.debug    = specific_params.get("debug", par["debug"])
         self.exc_func = specific_params.get("exc_func", par["exc_func"])
         if self.debug:
             print ('LIFNeuron(): Created {} neuron starting at time {}'.format(self.type, self.t))
@@ -85,13 +90,18 @@ class LIFNeuron():
     def spike_generator(self, neuron_input):
         # Create local arrays for this run
         duration = len(neuron_input)
-        V_m = np.full(duration, self.V_rest) #len(time)) # potential (V) trace over time
+        V_m = np.full(duration, self.V_rest) #len(time)) # potential (mV) trace over time
         exc = np.full((4, duration), self.V_rest)
         exc[1, :] = self.V_th
         exc[2, :] = self.tau_ref
         exc[3, :] = self.gain
         time = np.arange(self.t, self.t+duration)
         spikes = np.zeros(duration)  #len(time))
+
+        # make sure inputs are spikes
+        for input in neuron_input:
+            if input >= 0:
+                input = self.V_spike
 
         if self.debug:
             print ('spike_generator(): Running time period self.t={}, self.t+duration={}'
@@ -100,6 +110,9 @@ class LIFNeuron():
         if self.debug:
             print ('LIFNeuron.spike_generator.initial_state(input={}, duration={}, initial V_m={}, t={})'
                .format(neuron_input, duration, V_m[-1], self.t))
+
+        # print(neuron_input)
+        # input()
 
         for i in range(duration):
             if self.debug:
@@ -165,8 +178,7 @@ def create_neurons(num_layers, num_neurons, debug=False, **specific_params):
         neurons.append(neuron_layer)
     return neurons
 
-neurons = create_neurons(num_layers, num_neurons, debug=False,
-            V_rest=-.5, exc_func = exc_func)
+neurons = create_neurons(num_layers, num_neurons, debug = False, exc_func = exc_func)
 
 # Simulate spike propagation through layers
 layer_spikes = []
@@ -175,9 +187,9 @@ for layer in np.arange(num_layers):
         # Run stimuli for each neuron in layer 0
         stimulus_len = len(neuron_input)
         for neuron in np.arange(num_neurons):
-            random.seed(42) # Set seed for reproduction
             offset = random.randint(0, time)   # Simulates stimulus starting at different times
             stimulus = np.ones_like(neuron_input)
+            # indices = np.random.choice(stimulus, random.randrange(len(stimulus)), replace=False) # TODO: make indices random
             stimulus[offset:stimulus_len] = neuron_input[0:stimulus_len - offset]
             neurons[layer][neuron].spike_generator(stimulus)
 
@@ -188,8 +200,16 @@ for layer in np.arange(num_layers):
 
     else:
         layer_spikes.append(np.zeros_like(neurons[layer-1][0].spikes))
+        neuron_start = int(np.ceil(-neuron_connections/2))
+        neuron_end = int(np.ceil(neuron_connections/2))
+
         for neuron in np.arange(num_neurons):
-            neurons[layer][neuron].spike_generator(layer_spikes[layer])
+            input_spikes = np.zeros_like(neurons[layer-1][0].spikes)
+
+            # par[neuron_connections] project to this neuron
+            for i in range(neuron_start, neuron_end):
+                input_spikes += neurons[layer-1][(neuron+i)%num_neurons].spikes
+            neurons[layer][neuron].spike_generator(input_spikes)
             layer_spikes[layer] += neurons[layer][neuron].spikes
         print("b")
         print(layer_spikes[layer])
