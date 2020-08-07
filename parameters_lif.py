@@ -20,8 +20,7 @@ par = {
     ##################
     # Leaky intergrate and fire parameters
     'T'                     : 5.0,       # total time to sumulate (ms)
-    'simulation_dt'         : 0.0125,   # Simulation timestep
-    'inpt'                  : 1.0,      # Neuron input voltage
+    'simulation_dt'         : 0.01,   # Simulation timestep
 
     'gain'                  : 1.0,      # neuron gain (unitless)
     't_rest'                : 0.05,        # initial refractory time
@@ -30,12 +29,17 @@ par = {
     'Rm'                    : 1.0,        # Resistance (kOhm)
     'Cm'                    : 10,       # Capacitance (uF)
     'tau_ref'               : 10.0,        # refractory period (ms)
-    'V_th'                  : 0.5,     # : 1  #spike threshold
-    'V_spike'               : 1.0,        # spike delta (V)
-    'V_rest'                : 0.0,        # resting potential (V)
+    'V_th'                  : -55,     # : 1  #spike threshold (mV); biological: -55 mV
+    'V_spike'               : 40,        # spike delta (mV); biological: 40 mV
+    'V_rest'                : -70,        # resting potential (mV); biological: -70 mV
     'type'                  : 'Leaky Integrate and Fire',
     'debug'                 : False,    # Watch neurons get made
     'exc_func'              : default_exc_func, #excitability function
+
+    # Synaptic plasticity
+    'synaptic_plasticity'   : True,
+    'n_std_devs'            : 5, # number of standard deviations from middle to ends of neuronal array for synaptic plasticity starting values
+
     # Network shape
     'num_layers'            : 2,
     'num_neurons'           : 100,
@@ -54,8 +58,13 @@ def update_parameters(updates):
 def update_dependencies():
     """ Updates all parameter dependencies """
     par['time'] = int(par['T'] / par['simulation_dt'])
-    par['neuron_input'] = np.full((par['time']),par['inpt'])
-    par['tau_m'] = par['Rm'] * par['Cm'] # Time constant
+    par['inpt'] = par['V_spike'] * 1.5
+    par['neuron_input'] = np.full((par['time']), par['inpt'])
+    par['tau_m'] = par['Rm'] * par['Cm'] # Time
+
+    # Start with all neurons projecting
+    if par['synaptic_plasticity']:
+        par['neuron_connections'] = par['num_neurons']
 
 # update_parameters()
 update_dependencies()

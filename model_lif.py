@@ -1,6 +1,5 @@
 """
-Nicolas Masse 2017
-Contributions from Gregory Grant, Catherine Lee
+Antony Simonoff, Adam Fine 2020
 """
 
 import numpy as np
@@ -10,7 +9,14 @@ import random
 import matplotlib
 # from tqdm.notebook import tqdm
 from parameters_lif import par, update_dependencies
+from graphing import plot_neuron_behaviour, plot_membrane_potential, plot_spikes
 # %matplotlib inline
+from scipy.stats import norm
+
+"""
+CURRENT COMPLEXITY: O(n^3) DUE TO 3 NESTED FOR LOOPS.
+COULD NEED TO BE REFACTORED.
+"""
 
 # Set seeds for reproduction
 random.seed(42)
@@ -20,44 +26,15 @@ T           = par['T']    # total time to sumulate (msec)
 dt          = par['simulation_dt'] # Simulation timestep
 time        = par['time']
 inpt        = par['inpt']   # Neuron input voltage
-neuron_input= np.zeros(par["neuron_input"].shape)
-neuron_input[500:2000] = 1.25 #par['neuron_input']
+# neuron_input= np.zeros(par['neuron_input'].shape)
+neuron_input= par['neuron_input']
+neuron_input[500:2000] = par['inpt'] * 1.5
 
 num_layers  = par['num_layers']
 num_neurons = par['num_neurons']
 neuron_connections = par['neuron_connections']
 
-# Graphing functions:
-def plot_neuron_behaviour(time, data, neuron_type, neuron_id, y_title):
-    # print ('Drawing graph with time.shape={}, data.shape={}'.format(time.shape, data.shape))
-    plt.plot(time, data)
-    plt.title('{0} @ {1}'.format(neuron_type, neuron_id))
-    plt.ylabel(y_title)
-    plt.xlabel('Time (msec)')
-
-    # Graph the data with some headroom
-    if min(data) < 0:
-        y_min = min(data)*1.2
-    elif min(data) == 0:
-        y_min = -1
-    elif min(data) > 0:
-        y_min = min(data)*0.8
-
-    if max(data) < 0:
-        y_max = max(data)*0.8
-    elif max(data) == 0:
-        y_max = 1
-    elif max(data) > 0:
-        y_max = max(data)*1.2
-
-    plt.ylim([y_min, y_max])
-    plt.show()
-
-def plot_membrane_potential(time, V_m, neuron_type, neuron_id = 0):
-    plot_neuron_behaviour(time, V_m, neuron_type, neuron_id, y_title = 'Membrane potential (mV)')
-
-def plot_spikes(time, V_m, neuron_type, neuron_id = 0):
-    plot_neuron_behaviour(time, V_m, neuron_type, neuron_id, y_title = 'Spike (mV)')
+synaptic_plasticity = par['synaptic_plasticity']
 
 # Basic LIF Neuron class
 class LIFNeuron():
@@ -81,9 +58,32 @@ class LIFNeuron():
         self.V_th     = specific_params.get("V_th", par["V_th"])       # spike threshold (mV)
         self.V_spike  = specific_params.get("V_spike", par["V_spike"])   # spike delta (mV)
         self.V_rest   = specific_params.get("V_rest", par['V_rest'])    # resting potential (mV)
-        self.type     = specific_params.get("type", par["type"]
+        self.type     = specific_params.get("type", par["type"])
         self.debug    = specific_params.get("debug", par["debug"])
         self.exc_func = specific_params.get("exc_func", par["exc_func"])
+        self.synaptic_plasticity = specific_params.get("synaptic_plasticity", par["synaptic_plasticity"])
+
+        if self.synaptic_plasticity:
+            self.n_std_devs = specific_params.get("n_std_devs", par["n_std_devs"])
+            # TODO: make not uniform
+            loc = np.floor(num_neurons/2)
+            scale = np.ceil(num_neurons/self.n_std_devs)/2
+
+            self.neuron_number = specific_params.get("neuron_number")
+
+            self.synaptic_plasticity = []
+
+            for neuron in range(num_neurons):
+                cdf = norm.cdf(neuron, loc = loc, scale = scale)
+                if cdf > 0.5:
+                    cdf = 0.5 - cdf%0.5
+
+                self.synaptic_plasticity.append(cdf)
+
+            self.synaptic_plasticity = np.roll(self.synaptic_plasticity, int(num_neurons/2))
+            self.synaptic_plasticity = np.roll(self.synaptic_plasticity, specific_params.get("neuron_number"))
+
+
         if self.debug:
             print ('LIFNeuron(): Created {} neuron starting at time {}'.format(self.type, self.t))
 
@@ -110,9 +110,6 @@ class LIFNeuron():
         if self.debug:
             print ('LIFNeuron.spike_generator.initial_state(input={}, duration={}, initial V_m={}, t={})'
                .format(neuron_input, duration, V_m[-1], self.t))
-
-        # print(neuron_input)
-        # input()
 
         for i in range(duration):
             if self.debug:
@@ -174,6 +171,7 @@ def create_neurons(num_layers, num_neurons, debug=False, **specific_params):
             print ('create_neurons(): Creating layer {}'.format(layer))
         neuron_layer = []
         for i in range(num_neurons):
+            specific_params = {'neuron_number': i}
             neuron_layer.append(LIFNeuron(debug=debug, **specific_params))
         neurons.append(neuron_layer)
     return neurons
@@ -206,9 +204,15 @@ for layer in np.arange(num_layers):
         for neuron in np.arange(num_neurons):
             input_spikes = np.zeros_like(neurons[layer-1][0].spikes)
 
-            # par[neuron_connections] project to this neuron
-            for i in range(neuron_start, neuron_end):
-                input_spikes += neurons[layer-1][(neuron+i)%num_neurons].spikes
+            if synaptic_plasticity:
+                for input_neuron in range(num_neurons):
+                    connection_strength = neurons[layer][neuron].synaptic_plasticity[input_neuron]
+                    input_spikes += neurons[layer-1][input_neuron].spikes * connection_strength
+            else:
+                for i in range(neuron_start, neuron_end):
+                    # par['neuron_connections'] project to this neuron
+                    input_spikes += neurons[layer-1][(neuron+i)%num_neurons].spikes
+
             neurons[layer][neuron].spike_generator(input_spikes)
             layer_spikes[layer] += neurons[layer][neuron].spikes
         print("b")
@@ -220,6 +224,7 @@ for layer in np.arange(num_layers):
     end_time = time
     print('Rendering neurons[{}][0] over the time period {}:{} ms'.format(layer, start_time, end_time))
 
+    """Graph results:"""
     # Raster plots:
     fig, axs = plt.subplots(num_layers)
     colors = ['C{}'.format(i) for i in range(num_layers)]
@@ -228,7 +233,6 @@ for layer in np.arange(num_layers):
 
     plt.show()
 
-    # Graph results
     plot_spikes(neurons[layer][0].time[start_time:end_time], layer_spikes[layer][start_time:end_time],
     'Input Spikes for {}'.format(neurons[layer][0].type), neuron_id = "{}/0".format(layer))
     plot_membrane_potential(neurons[layer][0].time[start_time:end_time], neurons[layer][0].V_m[start_time:end_time],
