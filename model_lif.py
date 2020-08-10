@@ -4,7 +4,7 @@ Antony Simonoff, Adam Fine 2020
 
 import numpy as np
 import matplotlib.pyplot as plt
-import pandas as pd
+# import pandas as pd
 import random
 import matplotlib
 # from tqdm.notebook import tqdm
@@ -14,7 +14,7 @@ from graphing import plot_neuron_behaviour, plot_membrane_potential, plot_spikes
 from scipy.stats import norm
 
 """
-CURRENT COMPLEXITY: O(n^3) DUE TO 3 NESTED FOR LOOPS.
+CURRENT COMPLEXITY: O(n^3) DUE TO 3 NESTED FOR LOOPS IN SPIKE PROPAGATION SIMULATION.
 COULD NEED TO BE REFACTORED.
 """
 
@@ -40,8 +40,10 @@ synaptic_plasticity = par['synaptic_plasticity']
 class LIFNeuron():
     def __init__(self, debug=True, **specific_params):
         # Simulation config (may not all be needed!)
-        self.dt       = par['neuron_dt']       # neuronal time step
-        self.t_rest   = par['t_rest']           # initial refractory time
+        self.dt       = dt       # neuronal time step. Equal to simulation time step
+        self.t        = specific_params.get("t", 0) # start time, can vary for different neurons
+        self.t_rest_absolute= specific_params.get("t_rest_absolute", par["t_rest_absolute"]) #absolute refractory time
+        self.t_rest_relative= specific_params.get("t_rest_relative", par["t_rest_relative"]) #relative refractory time
 
         #LIF Properties
         self.exc      = np.zeros((4,1))  # Resting potential (mV?), threshold (mV?), refractory period (ms), gain (unitless)
@@ -50,7 +52,6 @@ class LIFNeuron():
         self.spikes   = np.zeros(1)    # Output (spikes) for the neuron
 
         self.gain     = specific_params.get("gain", par["gain"])      # neuron gain (unitless)
-        self.t        = specific_params.get("t", par["t"])          # Neuron time step
         self.Rm       = specific_params.get("Rm", par["Rm"])        # Resistance (kOhm)
         self.Cm       = specific_params.get("Cm", par["Cm"])        # Capacitance (uF)
         self.tau_m    = specific_params.get("tau_m", par["tau_m"])     # Time constant (ms)
@@ -58,14 +59,16 @@ class LIFNeuron():
         self.V_th     = specific_params.get("V_th", par["V_th"])       # spike threshold (mV)
         self.V_spike  = specific_params.get("V_spike", par["V_spike"])   # spike delta (mV)
         self.V_rest   = specific_params.get("V_rest", par['V_rest'])    # resting potential (mV)
+        self.V_hyperpolar = specific_params.get("V_hyperpolar", par["V_hyperpolar"]) # hyperpolarization potential (mV)
         self.type     = specific_params.get("type", par["type"])
         self.debug    = specific_params.get("debug", par["debug"])
         self.exc_func = specific_params.get("exc_func", par["exc_func"])
+
         self.synaptic_plasticity = specific_params.get("synaptic_plasticity", par["synaptic_plasticity"])
+        self.syn_plas_constant = specific_params.get("syn_plas_constant", par["syn_plas_constant"])
 
         if self.synaptic_plasticity:
             self.n_std_devs = specific_params.get("n_std_devs", par["n_std_devs"])
-            # TODO: make not uniform
             loc = np.floor(num_neurons/2)
             scale = np.ceil(num_neurons/self.n_std_devs)/2
 
@@ -74,9 +77,11 @@ class LIFNeuron():
             self.synaptic_plasticity = []
 
             for neuron in range(num_neurons):
-                cdf = norm.cdf(neuron, loc = loc, scale = scale)
-                if cdf > 0.5:
-                    cdf = 0.5 - cdf%0.5
+                cdf = norm.cdf(neuron, loc = loc, scale = scale) * 2
+                if cdf > 1:
+                    cdf = 1 - cdf%1
+
+                cdf = cdf * self.syn_plas_constant
 
                 self.synaptic_plasticity.append(cdf)
 
@@ -92,16 +97,21 @@ class LIFNeuron():
         duration = len(neuron_input)
         V_m = np.full(duration, self.V_rest) #len(time)) # potential (mV) trace over time
         exc = np.full((4, duration), self.V_rest)
+
+        # TODO: change this to be consistent throughout code
+        self.tau_ref = self.t_rest_absolute
+
         exc[1, :] = self.V_th
-        exc[2, :] = self.tau_ref
+        exc[2, :] = self.tau_m
         exc[3, :] = self.gain
+        # exc[4, :] = self.V_hyperpolar
         time = np.arange(self.t, self.t+duration)
         spikes = np.zeros(duration)  #len(time))
 
         # make sure inputs are spikes
-        for input in neuron_input:
-            if input >= 0:
-                input = self.V_spike
+        for neuron in neuron_input:
+            if neuron >= 0:
+                neuron = self.V_spike
 
         if self.debug:
             print ('spike_generator(): Running time period self.t={}, self.t+duration={}'
@@ -115,7 +125,7 @@ class LIFNeuron():
             if self.debug:
                 print ('Index {}'.format(i))
 
-            if self.t > self.t_rest:
+            if self.t > self.t_rest_absolute + self.t_rest_relative:
 
                 V_m[i]=V_m[i-1] + (-V_m[i-1] + exc[0,i-1] + exc[3,i-1]*neuron_input[i-1]*self.Rm) / self.tau_m * self.dt
                 exc[:, i] = self.exc_func(self.V_rest, self.V_th, self.tau_ref, self.gain,
@@ -126,9 +136,18 @@ class LIFNeuron():
 
                 if V_m[i] >= exc[1,i]:
                     spikes[i] += self.V_spike
-                    self.t_rest = self.t + exc[2,i]
+                    self.t_rest_absolute = self.t + exc[2,i]
+                    V_m[i] = self.V_spike
+
                     if self.debug:
-                        print ('*** LIFNeuron.spike_generator.spike=(self.t_rest={}, self.t={}, self.tau_ref={})'.format(self.t_rest, self.t, self.tau_ref))
+                        print ('*** LIFNeuron.spike_generator.spike=(self.t_rest_absolute={}, self.t={}, self.tau_ref={})'.format(self.t_rest_absolute, self.t, self.tau_ref))
+
+            elif self.t_rest_absolute < self.t < self.t_rest_absolute + self.t_rest_relative:
+                exc[:, i] = self.exc_func(self.V_rest, self.V_th, self.tau_ref, self.gain,
+                                V_m[:i], spikes[:i], neuron_input[:i], exc[:,:i])
+
+                # V_m[i] = exc[4,i]
+                V_m[i] = self.V_hyperpolar
             else:
                 exc[:, i] = self.exc_func(self.V_rest, self.V_th, self.tau_ref, self.gain,
                                 V_m[:i], spikes[:i], neuron_input[:i], exc[:,:i])
@@ -165,6 +184,7 @@ def exc_func(V_rest, V_th, tau_ref, gain, V_m, spikes, I, exc):
 
 # Create neuronal array
 def create_neurons(num_layers, num_neurons, debug=False, **specific_params):
+    print("Making neuronal array...")
     neurons = []
     for layer in range(num_layers):
         if debug:
@@ -174,6 +194,7 @@ def create_neurons(num_layers, num_neurons, debug=False, **specific_params):
             specific_params = {'neuron_number': i}
             neuron_layer.append(LIFNeuron(debug=debug, **specific_params))
         neurons.append(neuron_layer)
+    print("Finished neuronal array creation")
     return neurons
 
 neurons = create_neurons(num_layers, num_neurons, debug = False, exc_func = exc_func)
@@ -185,10 +206,10 @@ for layer in np.arange(num_layers):
         # Run stimuli for each neuron in layer 0
         stimulus_len = len(neuron_input)
         for neuron in np.arange(num_neurons):
-            offset = random.randint(0, time)   # Simulates stimulus starting at different times
-            stimulus = np.ones_like(neuron_input)
-            # indices = np.random.choice(stimulus, random.randrange(len(stimulus)), replace=False) # TODO: make indices random
-            stimulus[offset:stimulus_len] = neuron_input[0:stimulus_len - offset]
+            stimulus = np.zeros_like(neuron_input)
+            indices = np.random.choice(np.arange(stimulus_len), random.randrange(len(stimulus)), replace=False)
+            for i in indices:
+                stimulus[i] = inpt
             neurons[layer][neuron].spike_generator(stimulus)
 
         # Break up for loops so neurons[..].spikes is created
