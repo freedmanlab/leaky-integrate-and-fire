@@ -26,7 +26,7 @@ par = {
     't_rest_absolute'       : 0.002,        # absolute refractory time; biological: 1-2ms
     't_rest_relative'       : 0.004,        # relative refractory time (hyperpolarization); biological: 3-4ms
     'neuron_dt'             : 0.001,    # Neuron dt
-    'Rm'                    : 3e6,        # Resistance (kOhm); biological: 300-500 MOhm
+    'Rm'                    : 3e8,        # Resistance (Ohm); biological: 300-500 MOhm
     'Cm'                    : 0.9e-6,       # Capacitance (F); biological: 0.9 uF
     'tau_ref'               : 10.0,        # refractory period (ms)
     'V_th'                  : -55,     #spike threshold (mV); biological: -55 mV

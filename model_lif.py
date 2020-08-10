@@ -50,6 +50,7 @@ class LIFNeuron():
         self.V_m      = np.zeros(1)    # Neuron potential (mV)
         self.time     = np.zeros(1)    # Time duration for the neuron (needed?)
         self.spikes   = np.zeros(1)    # Output (spikes) for the neuron
+        self.spiketimes=[]             # Time of when spikes happen
 
         self.gain     = specific_params.get("gain", par["gain"])      # neuron gain (unitless)
         self.Rm       = specific_params.get("Rm", par["Rm"])        # Resistance (kOhm)
@@ -138,6 +139,7 @@ class LIFNeuron():
                     spikes[i] += self.V_spike
                     self.t_rest_absolute = self.t + exc[2,i]
                     V_m[i] = self.V_spike
+                    self.spiketimes.append(self.t)
 
                     if self.debug:
                         print ('*** LIFNeuron.spike_generator.spike=(self.t_rest_absolute={}, self.t={}, self.tau_ref={})'.format(self.t_rest_absolute, self.t, self.tau_ref))
@@ -247,10 +249,14 @@ for layer in np.arange(num_layers):
 
     """Graph results:"""
     # Raster plots:
-    fig, axs = plt.subplots(num_layers)
-    colors = ['C{}'.format(i) for i in range(num_layers)]
-
-    axs[layer].eventplot(layer_spikes, orientation='horizontal', linelengths=1.5)
+    fig, axs = plt.subplots(2,1)
+    # for input_num in np.arange(num_inputs):
+    #     axs[0].plot(time_range, full_input[input_num, :], "b,")
+    # for output_num in np.arange(num_neurons):
+    #     axs[0].plot(time_range, neurons[0][neuron].V_m, "r,")
+    axs[1].eventplot([neurons[0][neuron].spiketimes for neuron in np.arange(num_neurons)])
+    axs[0].set_title("input")
+    axs[1].set_title("output")
 
     plt.show()
 
