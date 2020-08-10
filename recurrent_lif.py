@@ -15,6 +15,7 @@ from parameters_rlif import par, update_dependencies
 T           = par['T']    # total time to simulate (msec)
 dt          = par['simulation_dt'] # Simulation timestep
 dts        = par['timesteps']
+input_dts = par['input_timesteps']
 V_in       = par['V_in']   # Neuron input voltage
 
 time_range = np.arange(0, T, dt)
@@ -25,10 +26,10 @@ num_inputs = par['num_inputs']
 
 np.random.seed(3)
 
-neuron_input = np.random.normal(0, .01, (num_inputs, dts))
+neuron_input = np.random.normal(0, .005, (num_inputs, dts))
 for inpt in np.arange(num_inputs):
-    offset = np.random.randint(-dts // 10, dts / 10)
-    neuron_input[inpt, offset + dts // 6:offset + dts // 2] += V_in
+    offset = np.random.randint(0, dts / 10)
+    neuron_input[inpt, offset:offset + input_dts] += V_in
 
 
 
@@ -108,6 +109,7 @@ class LIFNeuron():
         self.exc      = np.zeros((4,dts))# Resting potential (mV?), threshold (mV?), refractory period (ms), gain (unitless)
         self.V_m      = np.zeros(dts)+self.V_rest    # Neuron potential (mV)
         self.spikes   = np.zeros(dts)
+        self.spiketimes = []
         self.exc[0, :] = self.V_rest
         self.exc[1, :] = self.V_th
         self.exc[2, :] = self.tau_ref
@@ -128,6 +130,7 @@ class LIFNeuron():
 
             if self.V_m[timestep] >= self.exc[1,timestep]:
                 self.spikes[timestep] += self.V_spike
+                self.spiketimes.append(timestep*dt)
                 # if i+1 < spikes.shape[0]:
                 #     spikes[i+1] += self.V_spike
                 self.t_rest = timestep*dt + self.exc[2,timestep]
@@ -160,8 +163,7 @@ def create_neurons(num_layers, num_neurons, debug=False, **specific_params):
         neurons.append(neuron_layer)
     return neurons
 
-neurons = create_neurons(num_layers, num_neurons, debug=False,
-            V_rest=-.5, exc_func = exc_func)
+neurons = create_neurons(num_layers, num_neurons, debug=False, exc_func = exc_func)
 
 full_input = np.zeros((num_inputs+num_neurons,dts))
 full_input[:num_inputs, :] = neuron_input
@@ -177,10 +179,10 @@ for neuron in np.arange(num_neurons):
 
 fig, axs = plt.subplots(2,1)
 for input_num in np.arange(num_inputs):
-    axs[0].plot(time_range, full_input[input_num, :])
-for neuron in np.arange(num_neurons):
-    axs[0].plot(time_range, full_input[num_inputs + neuron, :])
-    axs[1].plot(time_range, full_output[neuron, :])
+    axs[0].plot(time_range, full_input[input_num, :], "b,")
+for output_num in np.arange(num_neurons):
+    axs[0].plot(time_range, neurons[0][neuron].V_m, "r,")
+axs[1].eventplot([neurons[0][neuron].spiketimes for neuron in np.arange(num_neurons)])
 axs[0].set_title("input")
 axs[1].set_title("output")
 

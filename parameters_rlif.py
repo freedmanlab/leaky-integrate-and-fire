@@ -21,7 +21,8 @@ par = {
     # Leaky intergrate and fire parameters
     'T'                     : 500.0,       # total time to simulate (ms)
     'simulation_dt'         : 0.125,   # Simulation timestep (ms)
-    'V_in'                  : .05,      # Neuron input voltage
+    'V_in'                  : .1,      # Neuron input voltage
+    'input_duration'        : 10.0,     # duration of the input current (ms)
 
     'gain'                  : 1.0,      # neuron gain (unitless)
     't_rest'                : 0.05,        # initial refractory time
@@ -56,6 +57,7 @@ def update_parameters(updates):
 def update_dependencies():
     """ Updates all parameter dependencies """
     par['timesteps'] = int(par['T'] / par['simulation_dt'])
+    par['input_timesteps'] = int(par['input_duration']/par['simulation_dt'])
     par['tau_m'] = par['Rm'] * par['Cm'] # Time constant
 
 # update_parameters()
