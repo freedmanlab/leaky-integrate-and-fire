@@ -1,16 +1,13 @@
 """
-Antony Simonoff, Adam Fine 2020
+Antony Simonoff 2020
 """
 
 import numpy as np
 import matplotlib.pyplot as plt
-# import pandas as pd
 import random
 import matplotlib
-# from tqdm.notebook import tqdm
 from parameters_lif import par, update_dependencies
-from graphing import plot_neuron_behaviour, plot_membrane_potential, plot_spikes
-# %matplotlib inline
+from analysis import plot_neuron_behaviour, plot_membrane_potential, plot_spikes
 from scipy.stats import norm
 
 """
@@ -32,6 +29,7 @@ neuron_input[500:2000] = par['inpt'] * 1.5
 
 num_layers  = par['num_layers']
 num_neurons = par['num_neurons']
+num_input_neurons = par['num_input_neurons']
 neuron_connections = par['neuron_connections']
 
 synaptic_plasticity = par['synaptic_plasticity']
@@ -149,7 +147,7 @@ class LIFNeuron():
                                 V_m[:i], spikes[:i], neuron_input[:i], exc[:,:i])
 
                 # V_m[i] = exc[4,i]
-                V_m[i] = self.V_hyperpolar
+                V_m[i] = self.V_hyperpolar # TODO: Make decay be biological
             else:
                 exc[:, i] = self.exc_func(self.V_rest, self.V_th, self.tau_ref, self.gain,
                                 V_m[:i], spikes[:i], neuron_input[:i], exc[:,:i])
@@ -201,14 +199,18 @@ def create_neurons(num_layers, num_neurons, debug=False, **specific_params):
 
 neurons = create_neurons(num_layers, num_neurons, debug = False, exc_func = exc_func)
 
-# Simulate spike propagation through layers
+"""Calculate spike propagation through layers"""
 layer_spikes = []
+
+# Calculate inputs
 for layer in np.arange(num_layers):
     if layer == 0: # Sum spikes in layer 0
         # Run stimuli for each neuron in layer 0
         stimulus_len = len(neuron_input)
         for neuron in np.arange(num_neurons):
             stimulus = np.zeros_like(neuron_input)
+            # TODO: Make this be not random and encode task information
+            # TODO: Create input encoding function, pass results to layer 0 neurons
             indices = np.random.choice(np.arange(stimulus_len), random.randrange(len(stimulus)), replace=False)
             for i in indices:
                 stimulus[i] = inpt
@@ -250,11 +252,12 @@ for layer in np.arange(num_layers):
     """Graph results:"""
     # Raster plots:
     fig, axs = plt.subplots(2,1)
+    fig.suptitle("Rendering neurons, Rm = {}, Cm = {}, tau_m = {}".format(neurons[layer][0].Rm, neurons[layer][0].Cm, neurons[layer][0].tau_m))
     # for input_num in np.arange(num_inputs):
     #     axs[0].plot(time_range, full_input[input_num, :], "b,")
     # for output_num in np.arange(num_neurons):
     #     axs[0].plot(time_range, neurons[0][neuron].V_m, "r,")
-    axs[1].eventplot([neurons[0][neuron].spiketimes for neuron in np.arange(num_neurons)])
+    axs[1].eventplot([neurons[layer][neuron].spiketimes for neuron in np.arange(num_neurons)])
     axs[0].set_title("input")
     axs[1].set_title("output")
 

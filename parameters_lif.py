@@ -20,7 +20,7 @@ par = {
     ##################
     # Leaky intergrate and fire parameters
     'T'                     : 0.5,       # total time to sumulate (s)
-    'simulation_dt'         : 0.001,   # Simulation timestep
+    'simulation_dt'         : 0.001,   # Simulation timestep (ms)
 
     'gain'                  : 1.0,      # neuron gain (unitless)
     't_rest_absolute'       : 0.002,        # absolute refractory time; biological: 1-2ms
@@ -40,11 +40,12 @@ par = {
     # Synaptic plasticity
     'synaptic_plasticity'   : True,
     'n_std_devs'            : 5, # number of standard deviations from middle to ends of neuronal array for synaptic plasticity starting values
-    'syn_plas_constant'     : 1, # weight multiplier of synaptic plasticity values
+    'syn_plas_constant'     : 1e-5, # weight multiplier of synaptic plasticity values
 
     # Network shape
-    'num_layers'            : 2,
+    'num_layers'            : 2, # does NOT include input layer; this is number of hidden layers
     'num_neurons'           : 100,
+    'num_input_neurons'     : 5, # number of input neurons. These somehow encode task information, firing rate?
     'neuron_connections'    : 3, # only used if synaptic plasticity is False
 }
 
@@ -63,6 +64,8 @@ def update_dependencies():
     par['inpt'] = par['V_spike'] * 1.5
     par['neuron_input'] = np.full((par['time']), par['inpt'])
     par['tau_m'] = par['Rm'] * par['Cm'] # Time
+
+    par['num_layers'] = par['num_layers'] + 1 # account for input layer
 
     # Start with all neurons projecting
     if par['synaptic_plasticity']:
