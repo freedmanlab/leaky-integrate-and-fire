@@ -6,9 +6,11 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 import matplotlib
-from parameters_lif import par, update_dependencies
 from analysis import plot_neuron_behaviour, plot_membrane_potential, plot_spikes
 from scipy.stats import norm
+
+from parameters_lif import par, update_dependencies
+# from training import create_neurons, encode_task
 
 """
 CURRENT COMPLEXITY: O(n^3) DUE TO 3 NESTED FOR LOOPS IN SPIKE PROPAGATION SIMULATION.
@@ -16,8 +18,8 @@ COULD NEED TO BE REFACTORED.
 """
 
 # Set seeds for reproduction
-random.seed(42)
-np.random.seed(42)
+# random.seed(42)
+# np.random.seed(42)
 
 T           = par['T']    # total time to sumulate (msec)
 dt          = par['simulation_dt'] # Simulation timestep
@@ -30,9 +32,14 @@ neuron_input[500:2000] = par['inpt'] * 1.5
 num_layers  = par['num_layers']
 num_neurons = par['num_neurons']
 num_input_neurons = par['num_input_neurons']
+num_output_neurons = par['num_output_neurons']
 neuron_connections = par['neuron_connections']
 
 synaptic_plasticity = par['synaptic_plasticity']
+
+task_info = par['task_info']
+
+debug = par['debug']
 
 # Basic LIF Neuron class
 class LIFNeuron():
@@ -62,6 +69,8 @@ class LIFNeuron():
         self.type     = specific_params.get("type", par["type"])
         self.debug    = specific_params.get("debug", par["debug"])
         self.exc_func = specific_params.get("exc_func", par["exc_func"])
+
+        self.baseline_firing_rate= specific_params.get("baseline_firing_rate", par["baseline_firing_rate"])
 
         self.synaptic_plasticity = specific_params.get("synaptic_plasticity", par["synaptic_plasticity"])
         self.syn_plas_constant = specific_params.get("syn_plas_constant", par["syn_plas_constant"])
@@ -183,8 +192,7 @@ def exc_func(V_rest, V_th, tau_ref, gain, V_m, spikes, I, exc):
     return V_rest, exc_thresh, tau_ref, exc_gain
 
 # Create neuronal array
-def create_neurons(num_layers, num_neurons, debug=False, **specific_params):
-    print("Making neuronal array...")
+def create_neurons(num_layers = par['num_layers'], num_neurons = par['num_neurons'], debug=False, **specific_params):
     neurons = []
     for layer in range(num_layers):
         if debug:
@@ -194,78 +202,188 @@ def create_neurons(num_layers, num_neurons, debug=False, **specific_params):
             specific_params = {'neuron_number': i}
             neuron_layer.append(LIFNeuron(debug=debug, **specific_params))
         neurons.append(neuron_layer)
-    print("Finished neuronal array creation")
     return neurons
 
-neurons = create_neurons(num_layers, num_neurons, debug = False, exc_func = exc_func)
+def encode_task(num_input_neurons = par['num_input_neurons'], task_info = task_info):
+    if task_info == 'DMS':
+        input_layer = create_neurons(num_layers = 1, num_neurons = num_input_neurons, debug = False, exc_func = exc_func)[0]
+        # For now, DMS with only 4 directions is supported. TODO: change to 8 directions, see if it changes
+        match = random.randrange(8)
+        sample = random.randrange(8)
 
-"""Calculate spike propagation through layers"""
-layer_spikes = []
+        loc_m = 550 + 50 * match
+        loc_s = 2050 + 50 * sample
+        scale = 100
+        for input_neuron in np.arange(num_input_neurons):
+            input_layer[input_neuron].spikes = np.zeros_like(neuron_input)
 
-# Calculate inputs
-for layer in np.arange(num_layers):
-    if layer == 0: # Sum spikes in layer 0
-        # Run stimuli for each neuron in layer 0
-        stimulus_len = len(neuron_input)
-        for neuron in np.arange(num_neurons):
-            stimulus = np.zeros_like(neuron_input)
-            # TODO: Make this be not random and encode task information
-            # TODO: Create input encoding function, pass results to layer 0 neurons
-            indices = np.random.choice(np.arange(stimulus_len), random.randrange(len(stimulus)), replace=False)
-            for i in indices:
-                stimulus[i] = inpt
-            neurons[layer][neuron].spike_generator(stimulus)
+            """ DMS task encoding """
+            # Fixation:
+            for spike in np.arange(len(neuron_input))[0:500]:
+                if spike % input_layer[input_neuron].baseline_firing_rate == 0:
+                    input_layer[input_neuron].spikes[spike] = par['V_spike']
 
-        # Break up for loops so neurons[..].spikes is created
-        layer_spikes.append(np.zeros_like(neurons[layer][0].spikes))
-        for neuron in np.arange(num_neurons):
-            layer_spikes[layer] += neurons[layer][neuron].spikes
+            # Sample
+            for spike in np.arange(len(neuron_input))[500:1000]:
+                cdf = norm.cdf(spike, loc = loc_m, scale = scale) * 2
+                if cdf > 1:
+                    cdf = 1 - cdf%1
+                input_layer[input_neuron].spikes[spike] = np.random.choice([0, 1], p = [1-cdf, cdf])
+
+            # Delay
+            for spike in np.arange(len(neuron_input))[1000:2000]:
+                if spike % input_layer[input_neuron].baseline_firing_rate == 0:
+                    input_layer[input_neuron].spikes[spike] = par['V_spike']
+
+            # Test
+            for spike in np.arange(len(neuron_input))[2000:2500]:
+                cdf = norm.cdf(spike, loc = loc_s, scale = scale) * 2
+                if cdf > 1:
+                    cdf = 1 - cdf%1
+
+                input_layer[input_neuron].spikes[spike] = np.random.choice([0, 1], p = [1-cdf, cdf])
+
+        return input_layer, match, sample
+
+    elif task_info == 'baseline_firing':
+        # TEMP:
+        input_layer = create_neurons(num_layers = 1, num_neurons = num_input_neurons, debug = False, exc_func = exc_func)[0]
+        for input_neuron in np.arange(num_input_neurons):
+            input_layer[input_neuron].spikes = np.zeros_like(neuron_input)
+            for spike in np.arange(len(neuron_input)):
+                if spike % input_layer[input_neuron].baseline_firing_rate == 0:
+                    input_layer[input_neuron].spikes[spike] = par['V_spike']
+        return input_layer, match, sample
 
     else:
-        layer_spikes.append(np.zeros_like(neurons[layer-1][0].spikes))
-        neuron_start = int(np.ceil(-neuron_connections/2))
-        neuron_end = int(np.ceil(neuron_connections/2))
+        task_info = np.arange(num_input_neurons)
+        input_layer = create_neurons(num_layers = 1, num_neurons = num_input_neurons, debug = False, exc_func = exc_func)[0]
+        split = int(len(neuron_input)/num_input_neurons)
+        for input_neuron in np.arange(num_input_neurons):
+            input_layer[input_neuron].spikes = np.zeros_like(neuron_input)
+            input_layer[input_neuron].spikes[split * input_neuron:split * (input_neuron + 1)] = par['V_spike'] # change V_spike to something more accurate
 
-        for neuron in np.arange(num_neurons):
-            input_spikes = np.zeros_like(neurons[layer-1][0].spikes)
+        return input_layer, None, None
 
-            if synaptic_plasticity:
-                for input_neuron in range(num_neurons):
-                    connection_strength = neurons[layer][neuron].synaptic_plasticity[input_neuron]
-                    input_spikes += neurons[layer-1][input_neuron].spikes * connection_strength
+
+
+def main():
+    """ Main loop function """
+    print("--> Encoding task")
+    input_layer, match, sample = encode_task()
+    print("--> Finished task encoding")
+
+    print("--> Making neuronal array")
+    neurons = create_neurons(num_layers, num_neurons, debug = False, exc_func = exc_func)
+    output_layer = create_neurons(1, num_output_neurons, debug = False, exc_func = exc_func)[0]
+    print("--> Finished neuronal array creation")
+
+    """Calculate spike propagation through layers"""
+    layer_spikes = []
+
+    task_accuracy = []
+
+    # Calculate inputs
+    for layer in np.arange(num_layers + 1):
+        if layer == 0: # Sum spikes in layer 0
+            split = int(num_neurons / num_input_neurons)
+            for input_neuron in np.arange(num_input_neurons):
+                for neuron in np.arange(split * input_neuron, split * (input_neuron + 1)):
+                    neurons[layer][neuron].spike_generator(input_layer[input_neuron].spikes)
+
+            # Break up for loops so neurons[..].spikes is created
+            layer_spikes.append(np.zeros_like(neurons[layer][0].spikes))
+            for neuron in np.arange(num_neurons):
+                layer_spikes[layer] += neurons[layer][neuron].spikes
+
+        elif 0 < layer < num_layers:
+            layer_spikes.append(np.zeros_like(neurons[layer-1][0].spikes))
+
+            for neuron in np.arange(num_neurons):
+                input_spikes = np.zeros_like(neurons[layer-1][0].spikes)
+
+                if synaptic_plasticity:
+                    for input_neuron in range(num_neurons):
+                        connection_strength = neurons[layer][neuron].synaptic_plasticity[input_neuron]
+                        input_spikes += neurons[layer-1][input_neuron].spikes * connection_strength
+                else:
+                    for i in range(neuron_start, neuron_end):
+                        # par['neuron_connections'] project to this neuron
+                        neuron_start = int(np.ceil(-neuron_connections/2))
+                        neuron_end = int(np.ceil(neuron_connections/2))
+                        input_spikes += neurons[layer-1][(neuron+i)%num_neurons].spikes
+
+                neurons[layer][neuron].spike_generator(input_spikes)
+                layer_spikes[layer] += neurons[layer][neuron].spikes
+
+        else:
+            split = int(num_neurons / num_output_neurons)
+            layer_spikes.append(np.zeros_like(neurons[layer-1][0].spikes))
+            for output_neuron in np.arange(num_output_neurons):
+                for neuron in np.arange(split * output_neuron, split * (output_neuron+1)):
+                    input_spikes = np.zeros_like(neurons[layer-1][0].spikes)
+                    input_spikes += neurons[layer-1][neuron].spikes
+
+                output_layer[output_neuron].spike_generator(input_spikes)
+                layer_spikes[layer] += output_layer[output_neuron].spikes
+
+
+
+            print("layer_spikes[{}]".format(layer))
+            print(layer_spikes[layer])
+            print(np.shape(layer_spikes[layer]))
+
+        start_time = 0
+        end_time = time
+        print('Propagating through layer {} over the time period {}:{} ms'.format(layer, start_time, end_time))
+
+        """Graph results:"""
+        # Raster plots:
+        if 0 < layer < num_layers and False:
+            fig, axs = plt.subplots(2,1)
+            fig.suptitle("Rendering neurons, layer {}, Rm = {}, Cm = {}, tau_ref = {}".format(layer, neurons[layer][0].Rm, neurons[layer][0].Cm, neurons[layer][0].tau_m))
+            axs[0].eventplot([neurons[layer-1][neuron].spiketimes for neuron in np.arange(num_neurons)])
+            axs[1].eventplot([neurons[layer][neuron].spiketimes for neuron in np.arange(num_neurons)])
+            axs[0].set_title("Layer {} spikes".format(layer-1))
+            axs[1].set_title("Layer {} spikes".format(layer))
+
+            plt.show()
+
+        elif layer == num_layers:
+            fig, axs = plt.subplots(2,1)
+            fig.suptitle("Input and Output, Rm = {}, Cm = {}, tau_ref = {}".format(neurons[0][0].Rm, neurons[0][0].Cm, neurons[0][0].tau_m))
+            axs[0].eventplot([neurons[0][neuron].spiketimes for neuron in np.arange(num_neurons)])
+            axs[1].eventplot([output_layer[output_neuron].spiketimes for output_neuron in np.arange(num_output_neurons)])
+            axs[0].set_title("input")
+            axs[1].set_title("output")
+
+            plt.show()
+
+        if layer == False:
+            # plot_spikes(neurons[layer][0].time[start_time:end_time], layer_spikes[layer][start_time:end_time],
+            # 'Input Spikes for {}'.format(neurons[layer][0].type), neuron_id = "{}/0".format(layer)) DEPRECATED
+            plot_membrane_potential(neurons[layer][0].time[start_time:end_time], neurons[layer][0].V_m[start_time:end_time],
+            'Membrane Potential {}'.format(neurons[layer][0].type), neuron_id = "Layer = {}, neuron = {}".format(layer, 0))
+            # plot_spikes(neurons[layer][0].time[start_time:end_time], neurons[layer][0].spikes[start_time:end_time],
+            # 'Output spikes for {}'.format(neurons[layer][0].type), neuron_id = "{}/0".format(layer)) DEPRECATED
+
+    def decode_task(output_layer = output_layer, task_info = task_info):
+        if task_info == "DMS":
+            if match == sample:
+                target = 0
             else:
-                for i in range(neuron_start, neuron_end):
-                    # par['neuron_connections'] project to this neuron
-                    input_spikes += neurons[layer-1][(neuron+i)%num_neurons].spikes
+                target = 1
 
-            neurons[layer][neuron].spike_generator(input_spikes)
-            layer_spikes[layer] += neurons[layer][neuron].spikes
-        print("b")
-        print(layer_spikes[layer])
-        print(np.shape(layer_spikes[layer]))
-        # input()
+            task_error = abs(np.sum(output_layer[output_neuron].spikes[0:1250])/1250 - 0) + abs(np.sum(output_layer[output_neuron].spikes[1250:2500])/1250 - 1250)
 
-    start_time = 0
-    end_time = time
-    print('Rendering neurons[{}][0] over the time period {}:{} ms'.format(layer, start_time, end_time))
+            task_accuracy.append(task_error)
 
-    """Graph results:"""
-    # Raster plots:
-    fig, axs = plt.subplots(2,1)
-    fig.suptitle("Rendering neurons, Rm = {}, Cm = {}, tau_m = {}".format(neurons[layer][0].Rm, neurons[layer][0].Cm, neurons[layer][0].tau_m))
-    # for input_num in np.arange(num_inputs):
-    #     axs[0].plot(time_range, full_input[input_num, :], "b,")
-    # for output_num in np.arange(num_neurons):
-    #     axs[0].plot(time_range, neurons[0][neuron].V_m, "r,")
-    axs[1].eventplot([neurons[layer][neuron].spiketimes for neuron in np.arange(num_neurons)])
-    axs[0].set_title("input")
-    axs[1].set_title("output")
+        else:
+            pass
 
-    plt.show()
+    print("--> Decoding task")
+    decode_task()
+    print("Task accuracy:", task_accuracy)
+    print("--> Completed task decoding")
 
-    plot_spikes(neurons[layer][0].time[start_time:end_time], layer_spikes[layer][start_time:end_time],
-    'Input Spikes for {}'.format(neurons[layer][0].type), neuron_id = "{}/0".format(layer))
-    plot_membrane_potential(neurons[layer][0].time[start_time:end_time], neurons[layer][0].V_m[start_time:end_time],
-    'Membrane Potential {}'.format(neurons[layer][0].type), neuron_id = "{}/0".format(layer))
-    plot_spikes(neurons[layer][0].time[start_time:end_time], neurons[layer][0].spikes[start_time:end_time],
-    'Output spikes for {}'.format(neurons[layer][0].type), neuron_id = "{}/0".format(layer))
+main()

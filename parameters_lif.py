@@ -37,16 +37,22 @@ par = {
     'debug'                 : False,    # Watch neurons get made
     'exc_func'              : default_exc_func, #excitability function
 
+    'baseline_firing_rate'  : 50, # Baseline neuron firing rate (Hz); biological: 6-100 Hz
+
     # Synaptic plasticity
     'synaptic_plasticity'   : True,
     'n_std_devs'            : 5, # number of standard deviations from middle to ends of neuronal array for synaptic plasticity starting values
-    'syn_plas_constant'     : 1e-5, # weight multiplier of synaptic plasticity values
+    'syn_plas_constant'     : 1e-5, # weight multiplier of synaptic plasticity values (2e-3 for DMS)
 
     # Network shape
-    'num_layers'            : 2, # does NOT include input layer; this is number of hidden layers
+    'num_layers'            : 5, # does NOT include input or output layer; this is number of hidden layers
     'num_neurons'           : 100,
     'num_input_neurons'     : 5, # number of input neurons. These somehow encode task information, firing rate?
+    'num_output_neurons'    : 20, # number of output neurons. These somehow encode task information, firing rate?
     'neuron_connections'    : 3, # only used if synaptic plasticity is False
+
+    # Task information
+    'task_info'             : 'None', # Options: delayed match to sample (DMS), baseline firing (baseline_firing), None
 }
 
 def update_parameters(updates):
@@ -63,9 +69,9 @@ def update_dependencies():
     par['time'] = int(par['T'] / par['simulation_dt'])
     par['inpt'] = par['V_spike'] * 1.5
     par['neuron_input'] = np.full((par['time']), par['inpt'])
-    par['tau_m'] = par['Rm'] * par['Cm'] # Time
+    par['tau_m'] = par['Rm'] * par['Cm'] # Time constant
 
-    par['num_layers'] = par['num_layers'] + 1 # account for input layer
+    par['baseline_firing_rate'] = int(1/par['baseline_firing_rate'] * 1000) # Convert to ms / spike
 
     # Start with all neurons projecting
     if par['synaptic_plasticity']:
