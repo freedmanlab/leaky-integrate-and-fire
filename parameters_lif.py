@@ -20,7 +20,7 @@ par = {
     ##################
     # Leaky intergrate and fire parameters
     'T'                     : 0.5,       # total time to sumulate (s)
-    'simulation_dt'         : 0.001,   # Simulation timestep (ms)
+    'simulation_dt'         : 0.001,   # Simulation timestep (1 ms)
 
     'gain'                  : 1.0,      # neuron gain (unitless)
     't_rest_absolute'       : 0.002,        # absolute refractory time; biological: 1-2ms
@@ -37,22 +37,27 @@ par = {
     'debug'                 : False,    # Watch neurons get made
     'exc_func'              : default_exc_func, #excitability function
 
-    'baseline_firing_rate'  : 50, # Baseline neuron firing rate (Hz); biological: 6-100 Hz
+    'baseline_fr'  : 6, # Baseline neuron firing rate (Hz); biological: 6-100 Hz
 
     # Synaptic plasticity
     'synaptic_plasticity'   : True,
     'n_std_devs'            : 5, # number of standard deviations from middle to ends of neuronal array for synaptic plasticity starting values
-    'syn_plas_constant'     : 1e-5, # weight multiplier of synaptic plasticity values (2e-3 for DMS)
+    'syn_plas_constant'     : 1e-4, # weight multiplier of synaptic plasticity values
 
     # Network shape
-    'num_layers'            : 5, # does NOT include input or output layer; this is number of hidden layers
+    'n_hidden'              : 5, # does NOT include input or output layer; this is number of hidden layers
     'num_neurons'           : 100,
-    'num_input_neurons'     : 5, # number of input neurons. These somehow encode task information, firing rate?
-    'num_output_neurons'    : 20, # number of output neurons. These somehow encode task information, firing rate?
+    'num_input_neurons'     : 8, # number of input neurons. These somehow encode task information, firing rate?
+    'num_output_neurons'    : 2, # number of output neurons. These somehow encode task information, firing rate?
     'neuron_connections'    : 3, # only used if synaptic plasticity is False
+    'excitability_ratio'    : 0.8, # percentage of excitabliity neurons, inhibitory percentage = 1-excitability_ratio
 
     # Task information
-    'task_info'             : 'None', # Options: delayed match to sample (DMS), baseline firing (baseline_firing), None
+    'task_info'             : 'DMS', # Options: delayed match to sample (DMS), baseline firing (baseline_firing), None
+    'preferred_angle_fr'    : 75, # Firing rate at the preferred angle; biological: 75 Hz
+
+    # Trial params
+    'p_match_sample_eq'     : 0.25, # Probability that match and sample direction are equal
 }
 
 def update_parameters(updates):
@@ -71,11 +76,14 @@ def update_dependencies():
     par['neuron_input'] = np.full((par['time']), par['inpt'])
     par['tau_m'] = par['Rm'] * par['Cm'] # Time constant
 
-    par['baseline_firing_rate'] = int(1/par['baseline_firing_rate'] * 1000) # Convert to ms / spike
-
     # Start with all neurons projecting
     if par['synaptic_plasticity']:
         par['neuron_connections'] = par['num_neurons']
+
+    if par['task_info'] == 'DMS': # update all values for DMS
+        par['T'] = 3.0
+        par['num_input_neurons'] = 8
+        par['num_output_neurons'] = 2
 
 # update_parameters()
 update_dependencies()
