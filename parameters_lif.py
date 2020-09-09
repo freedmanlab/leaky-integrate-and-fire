@@ -40,9 +40,9 @@ par = {
     'baseline_fr'  : 6, # Baseline neuron firing rate (Hz); biological: 6-100 Hz
 
     # Synaptic plasticity
-    'synaptic_plasticity'   : True,
+    'synaptic_plasticity'   : True, # No option for False currently
     'n_std_devs'            : 5, # number of standard deviations from middle to ends of neuronal array for synaptic plasticity starting values
-    'syn_plas_constant'     : 1e-4, # weight multiplier of synaptic plasticity values
+    'syn_plas_constant'     : 1e-5, # weight multiplier of synaptic plasticity values
 
     # Network shape
     'n_hidden'              : 5, # does NOT include input or output layer; this is number of hidden layers
@@ -58,6 +58,8 @@ par = {
 
     # Trial params
     'p_match_sample_eq'     : 0.25, # Probability that match and sample direction are equal
+    'lr_w'                  : 0.01, # Learning rate for weights
+    'lr_th'                 : 0.01, # Learning rate for thresholds
 }
 
 def update_parameters(updates):

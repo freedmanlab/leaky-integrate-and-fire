@@ -10,7 +10,7 @@ from analysis import plot_neuron_behaviour, plot_membrane_potential, plot_spikes
 from scipy.stats import norm
 
 from parameters_lif import par, update_dependencies
-from training import poisson_spikes
+from training import poisson_spikes, loss_function
 
 """
 CURRENT COMPLEXITY: O(n^3) DUE TO 3 NESTED FOR LOOPS IN SPIKE PROPAGATION SIMULATION.
@@ -48,13 +48,18 @@ task_info = par['task_info']
 debug = par['debug']
 
 # Initialize all global matrices
-synaptic_weights = np.zeros((num_layers, num_neurons, num_neurons)) # shape = layer, this neuron, projected neuron
+# spikes_hidden = np.zeros((n_hidden, num_neurons, len(neuron_input))) # shape = layer, neuron, timesteps
+# V_m_hidden = np.zeros((n_hidden, num_neurons, len(neuron_input))) # shape = layer, neuron, timesteps
+synaptic_weights = np.zeros((n_hidden, num_neurons, num_neurons)) # shape = layer, this neuron, projected neuron
+trials = []
+task_accuracy = []
+
 
 # Basic LIF Neuron class
 class LIFNeuron():
     def __init__(self, debug=True, **specific_params):
         # Simulation config (may not all be needed!)
-        self.dt       = dt       # neuronal time step. Equal to simulation time step
+        self.dt       = dt       # neuronal time step. Equal to simulation time step. Does not vary between neurons
         self.t        = specific_params.get("t", 0) # start time, can vary for different neurons
         self.t_rest_absolute= specific_params.get("t_rest_absolute", par["t_rest_absolute"]) #absolute refractory time
         self.t_rest_relative= specific_params.get("t_rest_relative", par["t_rest_relative"]) #relative refractory time
@@ -64,7 +69,7 @@ class LIFNeuron():
         self.V_m      = np.zeros(1)    # Neuron potential (mV)
         self.time     = np.zeros(1)    # Time duration for the neuron (needed?)
         self.spikes   = np.zeros(1)    # Output (spikes) for the neuron
-        self.spiketimes=[]             # Time of when spikes happen
+        self.spiketimes=[]             # When spikes happen, used for plotting
 
         self.gain     = specific_params.get("gain", par["gain"])      # neuron gain (unitless)
         self.Rm       = specific_params.get("Rm", par["Rm"])        # Resistance (kOhm)
@@ -85,29 +90,18 @@ class LIFNeuron():
         self.synaptic_plasticity = specific_params.get("synaptic_plasticity", par["synaptic_plasticity"])
         self.syn_plas_constant = specific_params.get("syn_plas_constant", par["syn_plas_constant"])
 
-        if self.synaptic_plasticity:
-            self.n_std_devs = specific_params.get("n_std_devs", par["n_std_devs"])
-            loc = np.floor(num_neurons/2)
-            scale = np.ceil(num_neurons/self.n_std_devs)/2
-
+        if self.synaptic_plasticity: # Initialize synaptic plasticity randomly
             self.layer_number = specific_params.get("layer_number")
             self.neuron_number = specific_params.get("neuron_number")
 
             self.synaptic_plasticity = []
 
-
             for neuron in range(num_neurons):
-                cdf = norm.cdf(neuron, loc = loc, scale = scale) * 2
-                if cdf > 1:
-                    cdf = 1 - cdf%1
+                weight = random.random() * self.syn_plas_constant
+                self.synaptic_plasticity.append(weight)
 
-                cdf = cdf * self.syn_plas_constant
-
-                self.synaptic_plasticity.append(cdf)
-
-            self.synaptic_plasticity = np.roll(self.synaptic_plasticity, int(num_neurons/2))
-            self.synaptic_plasticity = np.roll(self.synaptic_plasticity, specific_params.get("neuron_number"))
-
+                if specific_params.get("neuron_type") == 'hidden':
+                    synaptic_weights[self.layer_number][self.neuron_number][neuron] = weight
 
         if self.debug:
             print ('LIFNeuron(): Created {} neuron starting at time {}'.format(self.type, self.t))
@@ -204,7 +198,7 @@ def exc_func(V_rest, V_th, tau_ref, gain, V_m, spikes, I, exc):
     return V_rest, exc_thresh, tau_ref, exc_gain
 
 # Create neuronal array
-def create_neurons(n_hidden = par['n_hidden'], num_neurons = par['num_neurons'], debug=False, excitability_ratio = par['excitability_ratio'], **specific_params):
+def create_neurons(n_hidden = par['n_hidden'], num_neurons = par['num_neurons'], debug=False, excitability_ratio = par['excitability_ratio'], neuron_type = 'hidden', **specific_params):
     neurons = []
     for layer in range(n_hidden):
         inhibitory_neurons = np.random.choice(np.arange(num_neurons), int(num_neurons * (1 - excitability_ratio)))
@@ -212,7 +206,7 @@ def create_neurons(n_hidden = par['n_hidden'], num_neurons = par['num_neurons'],
             print ('create_neurons(): Creating layer {}'.format(layer))
         neuron_layer = []
         for i in range(num_neurons):
-            specific_params = {'layer_number': i, 'neuron_number': i}
+            specific_params = {'layer_number': layer, 'neuron_number': i, 'neuron_type': neuron_type}
             neuron_layer.append(LIFNeuron(debug=debug, **specific_params))
         for inhibitory_neuron in inhibitory_neurons:
             for neuron in range(num_neurons):
@@ -224,10 +218,9 @@ def encode_task(num_input_neurons = par['num_input_neurons'], task_info = task_i
     if task_info == 'DMS':
         input_layer = create_neurons(n_hidden = 1, num_neurons = num_input_neurons, excitability_ratio = 1,  debug = False, exc_func = exc_func)[0]
         match = random.randrange(8)
-        p = np.full(8, (1-par['p_match_sample_eq'])/7)
+        p = np.full(8, (1-par['p_match_sample_eq'])/7) # the weight of match = sample is par['p_match_sample_eq']
         p[match] = par['p_match_sample_eq']
         sample = np.random.choice(np.arange(8), p = p)
-        # sample = random.randrange(8) # TODO: Change to weighh match higher
 
         for input_neuron in np.arange(num_input_neurons):
             input_layer[input_neuron].spikes = np.zeros_like(neuron_input)
@@ -305,7 +298,10 @@ def encode_task(num_input_neurons = par['num_input_neurons'], task_info = task_i
             input_layer[input_neuron].spikes = poisson_spikes(n_bins = len(neuron_input))
         return input_layer
 
-
+print("--> Making neuronal array")
+neurons = create_neurons(n_hidden, num_neurons, debug = False, exc_func = exc_func)
+output_layer = create_neurons(1, num_output_neurons, debug = False, excitability_ratio = 1, exc_func = exc_func)[0]
+print("--> Finished neuronal array creation")
 
 def main():
     """ Main loop function """
@@ -317,15 +313,8 @@ def main():
 
     print("--> Finished task encoding")
 
-    print("--> Making neuronal array")
-    neurons = create_neurons(n_hidden, num_neurons, debug = False, exc_func = exc_func)
-    output_layer = create_neurons(1, num_output_neurons, debug = False, excitability_ratio = 1, exc_func = exc_func)[0]
-    print("--> Finished neuronal array creation")
-
     """Calculate spike propagation through layers"""
     layer_spikes = []
-
-    task_accuracy = []
 
     # Calculate inputs
     for layer in np.arange(n_hidden + 1): # Propagates through hidden layers and then output layer
@@ -348,8 +337,8 @@ def main():
 
                 if synaptic_plasticity:
                     for input_neuron in range(num_neurons):
-                        connection_strength = neurons[layer][neuron].synaptic_plasticity[input_neuron]
-                        input_spikes += neurons[layer-1][input_neuron].spikes * connection_strength
+                        synaptic_weight = synaptic_weights[layer][neuron][input_neuron]
+                        input_spikes += neurons[layer-1][input_neuron].spikes * synaptic_weight
                 else:
                     for i in range(neuron_start, neuron_end):
                         # par['neuron_connections'] project to this neuron
@@ -403,34 +392,23 @@ def main():
 
             plt.show()
 
-        if layer == 0 or layer == n_hidden -1 : # Change for graphing
+        # if layer == 0 or layer == n_hidden -1: # Change for graphing
+        if False:
             plot_membrane_potential(neurons[layer][0].time[start_time:end_time], neurons[layer][0].V_m[start_time:end_time],
             'Membrane Potential {}'.format(neurons[layer][0].type), neuron_id = "Layer = {}, neuron = {}".format(layer, 0))
 
-    def decode_task(output_layer = output_layer, task_info = task_info):
-        if task_info == "DMS":
-            task_error = []
-            targets = [par['preferred_angle_fr'], par['baseline_fr']]
+    targets = np.array([par['preferred_angle_fr'], par['baseline_fr']])
+    values = np.zeros(2)
+    if match == sample:
+        values[0] = sum(output_layer[0].spikes[2500:3000]/(0.5 * par['V_spike']))
+        values[1] = sum(output_layer[1].spikes[2500:3000]/(0.5 * par['V_spike']))
+    if match != sample:
+        values[0] = sum(output_layer[0].spikes[2500:3000]/(0.5 * par['V_spike']))
+        values[1] = sum(output_layer[1].spikes[2500:3000]/(0.5 * par['V_spike']))
 
-            if match == sample:
-                neuron_1_error = targets[0] - sum(output_layer[0].spikes[2500:3000]/(0.5 * par['V_spike']))
-                neuron_2_error = targets[1] - sum(output_layer[1].spikes[2500:3000]/(0.5 * par['V_spike']))
-                task_error = np.average([neuron_1_error, neuron_2_error])
-                trials.append("match")
-            if match != sample:
-                neuron_1_error = targets[1] - sum(output_layer[0].spikes[2500:3000]/(0.5 * par['V_spike']))
-                neuron_2_error = targets[0] - sum(output_layer[1].spikes[2500:3000]/(0.5 * par['V_spike']))
-                task_error = np.average([neuron_1_error, neuron_2_error])
-                trials.append("nonmatch")
-
-            task_accuracy.append(task_error)
-
-        else:
-            pass
+    task_accuracy.append(loss_function(targets, values))
 
     print("--> Decoding task")
-    trials = []
-    decode_task()
     print("Task error:", task_accuracy, trials)
     print("--> Completed task decoding")
 
