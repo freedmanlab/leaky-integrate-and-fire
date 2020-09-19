@@ -214,7 +214,7 @@ for neuron in np.arange(num_neurons):
     full_output[neuron, :] = neurons[neuron].V_m
 
 fig, axs = plt.subplots(2,1, sharex=True)
-plt.get_current_fig_manager().window.showMaximized()
+# plt.get_current_fig_manager().window.showMaximized()
 axs[0].set_xlim([0, T])
 for input_num in np.arange(num_inputs):
     axs[0].plot(time_range, full_input[input_num, :], "b,")
@@ -232,7 +232,7 @@ axs[0].set_title("input")
 axs[1].set_title("output")
 
 fig2, axs2 = plt.subplots(2,1, sharex=True)
-plt.get_current_fig_manager().window.showMaximized()
+# plt.get_current_fig_manager().window.showMaximized()
 for neuron_num in np.arange(num_neurons):
     input_sum = np.sum(neurons[neuron_num].input)
     print("{0}: {1}".format(neurons[neuron_num].input_connected, input_sum))
@@ -251,7 +251,5 @@ for exc_prop in np.arange(4):
     axs3[exc_prop].plot(time_range, neurons[60].exc[exc_prop, :], "r")
 
 fig3.suptitle("Excitability properties")
-plt.get_current_fig_manager().window.showMaximized()
+# plt.get_current_fig_manager().window.showMaximized()
 plt.show()
-
-
