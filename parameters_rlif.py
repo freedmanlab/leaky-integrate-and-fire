@@ -31,6 +31,7 @@ par = {
     't_rest'                : 0.05,        # initial refractory time
     'Rm'                    : 1.0,        # Resistance (kOhm)
     'Cm'                    : 10,       # Capacitance (uF)
+    'tau_exc'               : 200,      # time constant for decay of exc properties (ms), >> tau_m
     'tau_ref'               : 5.0,        # refractory period (ms)
     'tau_abs_ref'           : 1.0,        # absolute refractory period (ms), lower bound for exc_refrac
     'V_th'                  : -.055,     # : 1  #spike threshold
@@ -45,13 +46,11 @@ par = {
     'voltage_decay_const'   : .5,        #decay constant for the conversion from spikes to current (ms)
     'decay_thresh'          : .0005,    #threshold for zeroing the current from a spike
     # Network shape
-    'num_layers'            : 1,
     'num_neurons'           : 100,
     'num_inputs'            : 5,
     'exc_prop'              : .8,     #proportion of neurons that are excitatory
-    'input_connect_binary_prob': .3, #governs what fraction of neurons are connected to the inputs
-    'input_connect_frac'    : .3, #governs how many inputs neurons that are connected to the inputs are connected to
-    'recur_connect_frac'    : .3, #governs connections between neurons
+    'input_connect_frac'    : .05, #governs how many neurons are connected to ONE input neuron
+    'recur_connect_frac'    : .15, #governs connections between neurons
 }
 
 def update_parameters(updates):
@@ -70,6 +69,7 @@ def update_dependencies():
     par['tau_m'] = par['Rm'] * par['Cm'] # Time constant
     par['num_current_timesteps'] = compute_current_timesteps()
     par['exc_num'] = int(par['exc_prop']*par['num_neurons'])
+    par['input_connected_num'] = int(par['input_connect_frac']*par['num_neurons'])*par['num_inputs']
 
 def compute_current_timesteps():
     times = par['simulation_dt']*np.arange(1000)
