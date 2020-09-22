@@ -13,7 +13,7 @@ def default_exc_func(V_rest, V_th, tau_ref, gain, V_m, spikes, I, exc):
     return V_rest, V_th, tau_ref, gain
 
 def spikes_to_current(time, tau):
-    return .0101*(np.exp(-(time/(4*tau)))-np.exp(-(time/tau)))
+    return 0.0101*(np.exp(-(time/(4*tau)))-np.exp(-(time/tau)))
 
 par = {
     # Setup parameters
@@ -22,27 +22,28 @@ par = {
 
     ##################
     # Leaky intergrate and fire parameters
-    'T'                     : 20.0,       # total time to simulate (s)
+    'T'                     : 2.0,       # total time to simulate (s)
     'simulation_dt'         : 0.001,   # Simulation timestep (1 ms)
     'V_in'                  : -50,      # Neuron input voltage
-    'input_duration'        : 200.0,     # duration of the input current (ms)
+    'input_duration'        : 12.0,     # duration of the input current (s) # DEPRECATED
 
     'gain'                  : 1.0,      # neuron gain (unitless)
     't_rest'                : 0.05,        # initial refractory time; biological: 1-2 ms
-    'Rm'                    : 3e8,        # Resistance (kOhm); biological: 300-500 MOhm
-    'Cm'                    : 0.9e-6,       # Capacitance (uF); biological: 0.9 uF
-    'tau_ref'               : 5.0,        # refractory period (ms)
-    'tau_abs_ref'           : 1.0,        # absolute refractory period (ms), lower bound for exc_refrac
+    'Rm'                    : 3e8,        # Resistance (Ohm); biological: 300-500 MOhm
+    'Cm'                    : 0.9e-6,       # Capacitance (F); biological: 0.9 uF
+    'tau_ref'               : 0.005,        # refractory period (s)
+    'tau_abs_ref'           : 0.001,        # absolute refractory period (s), lower bound for exc_refrac
     'V_th'                  : -55,     # spike threshold (mV); biological: -55 mV
-    'V_spike'               : -70,        # spike delta (mV); biological: -70 mV
-    'V_rest'                : -90,        # resting potential (mV); biological: -90 mV
+    'V_spike'               : 40,        # spike delta (mV); biological: 40 mV
+    'V_rest'                : -70,        # resting potential (mV); biological: -70 mV
+    'V_hyperpolar'          : - 90,        # hyperpolarization potential (mV); biological: -90 mV
     'type'                  : 'Leaky Integrate and Fire',
     'debug'                 : False,    # Watch neurons get made
     'exc_func'              : default_exc_func, #excitability function
-    'input_stdev'           : 5,     # standard deviation of the input Gaussian noise; biological: idk, # TODO: Find out
-    'voltage_stdev'         : 8,     # standard deviation of the neuron voltage update, also Gaussian; biological: idk # TODO: Find out
+    'input_stdev'           : 0.5,     # standard deviation of the input Gaussian noise; biological: idk, # TODO: Find out
+    'voltage_stdev'         : 3,     # standard deviation of the neuron voltage update, also Gaussian; biological: idk # TODO: Find out
     'spikes_to_current_func': spikes_to_current, # function for converting spikes to current
-    'voltage_decay_const'   : .5,        # decay constant for the conversion from spikes to current (ms)
+    'voltage_decay_const'   : .005,        # decay constant for the conversion from spikes to current (ms)
     'decay_thresh'          : .0005,    # threshold for zeroing the current from a spike
 
     # Network shape
