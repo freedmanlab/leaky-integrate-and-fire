@@ -29,8 +29,8 @@ par = {
 
     'gain'                  : 1.0,      # neuron gain (unitless)
     't_rest'                : 0.05,        # initial refractory time; biological: 1-2 ms
-    'Rm'                    : 3e8,        # Resistance (Ohm); biological: 300-500 MOhm
-    'Cm'                    : 0.9e-6,       # Capacitance (F); biological: 0.9 uF
+    'Rm'                    : 1,        # Resistance (Ohm); biological: 300-500 MOhm
+    'Cm'                    : .01,       # Capacitance (F); biological: 0.9 uF
     'tau_ref'               : 0.005,        # refractory period (s)
     'tau_abs_ref'           : 0.001,        # absolute refractory period (s), lower bound for exc_refrac
     'V_th'                  : -55,     # spike threshold (mV); biological: -55 mV
