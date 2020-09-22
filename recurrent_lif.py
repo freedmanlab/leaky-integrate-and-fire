@@ -15,9 +15,9 @@ T           = par['T']    # total time to simulate (ms)
 dt          = par['simulation_dt'] # Simulation timestep
 dts        = par['timesteps']
 tau_exc  = par['tau_exc']   # exc decay time constant (ms)
-current_dts = par['num_current_timesteps']
-current_func = par['spikes_to_current_func']
-current_profile = current_func(dt*np.arange(current_dts),par['voltage_decay_const'])
+spikepulse_dts = par['num_spikepulse_timesteps']
+spikepulse_func = par['spikes_to_spikepulse_func']
+spikepulse_profile = spikepulse_func(dt * np.arange(spikepulse_dts), par['voltage_decay_const'])
 input_dts = par['input_timesteps']
 V_in       = par['V_in']   # Neuron input voltage
 input_stdev = par['input_stdev']
@@ -105,8 +105,8 @@ class LIFNeuron():
 
         self.gain     = par['gain']      # neuron gain (unitless)
         self.t        = 0                # initial time
-        self.Rm       = par['Rm']        # Resistance (kOhm)
-        self.Cm       = par['Cm']        # Capacitance (uF)
+        self.Rm       = par['Rm']        # Resistance (Ohm)
+        self.Cm       = par['Cm']        # Capacitance (F)
         self.tau_m    = par['tau_m']     # Time constant (ms)
         self.tau_ref  = par['tau_ref']   # refractory period (ms)
         self.tau_exc  = par['tau_exc']   # exc decay time constant (ms)
@@ -139,17 +139,17 @@ class LIFNeuron():
             specific_input = np.sum(input*self.connections)
             self.input[timestep] = specific_input
             self.V_m[timestep] = self.V_m[timestep-1] + np.random.normal(0, voltage_stdev) +\
-                (-self.V_m[timestep-1] + self.exc[0,timestep-1] + self.exc[3,timestep-1]*specific_input*self.Rm) / self.tau_m * self.dt
+                (-self.V_m[timestep-1] + self.exc[0,timestep-1] + self.exc[3,timestep-1]*specific_input) / self.tau_m * self.dt
             self.exc[:, timestep] = self.exc_func(self.V_rest, self.V_th, self.tau_ref, self.gain,
                                       self.V_m[:timestep], self.spikes[:timestep], self.input[:timestep], self.exc[:,:timestep])
 
             if self.V_m[timestep] >= self.exc[1,timestep]:
                 self.spikes[timestep] += self.V_spike
                 try:
-                    self.output[timestep:timestep + current_dts] += current_profile
+                    self.output[timestep:timestep + spikepulse_dts] += spikepulse_profile
                 except:
                     print("ERROR LELLULULULULU")
-                    self.output[timestep:] += current_profile[:dts - timestep]
+                    self.output[timestep:] += spikepulse_profile[:dts - timestep]
                 self.spiketimes.append(timestep*dt)
                 # if i+1 < spikes.shape[0]:
                 #     spikes[i+1] += self.V_spike
@@ -164,27 +164,27 @@ class LIFNeuron():
 # define resting excitability function - params are V_rest, V_m, spikes, I, exc
 
 #make a spike rate increase function and a spike rate decrease function I think
-def exc_static_up_func(V_rest, V_th, tau_ref, gain, V_m, spikes, I, exc):
+def exc_static_up_func(V_rest, V_th, tau_ref, gain, V_m, spikes, input, exc):
     #make everything decay over time. rewrite this to be delta property?
 
     integrated_spikes = np.sum(spikes[-500:])
-    integrated_current = np.sum(I[-500:])
-    exc_rest = V_rest + integrated_current/2000
+    integrated_input = np.sum(input[-500:])
+    exc_rest = V_rest + integrated_input/2000
     exc_th = max(V_rest+.001, V_th - integrated_spikes/50)
     exc_refrac = max(par['tau_abs_ref'], tau_ref - integrated_spikes*2.5)
     exc_gain = gain + integrated_spikes*2.5
     return V_rest, V_th, tau_ref, gain
 
-def exc_static_down_func(V_rest, V_th, tau_ref, gain, V_m, spikes, I, exc):
+def exc_static_down_func(V_rest, V_th, tau_ref, gain, V_m, spikes, input, exc):
     return V_rest, V_th, tau_ref, gain
 
-def exc_decay_up_func(V_rest, V_th, tau_ref, gain, V_m, spikes, I, exc):
+def exc_decay_up_func(V_rest, V_th, tau_ref, gain, V_m, spikes, input, exc):
     exc_rest = exc[0, -1] - (exc[0, -1]-V_rest)*dt/tau_exc
     if spikes[-1] > 0:
         exc_rest += .002
     return exc_rest, V_th, tau_ref, gain
 
-def exc_decay_down_func(V_rest, V_th, tau_ref, gain, V_m, spikes, I, exc):
+def exc_decay_down_func(V_rest, V_th, tau_ref, gain, V_m, spikes, input, exc):
     exc_rest = exc[0, -1] - (exc[0, -1]-V_rest)*dt/tau_exc
     if spikes[-1] > 0:
         exc_rest -= .005

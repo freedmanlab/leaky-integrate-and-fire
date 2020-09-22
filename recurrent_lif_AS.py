@@ -16,10 +16,10 @@ from utils_rlif_AS import poisson_spikes
 T           = par['T']    # total time to simulate (ms)
 dt          = par['simulation_dt'] # Simulation timestep
 dts         = par['timesteps']
-current_dts = par['num_current_timesteps']
-current_func= par['spikes_to_current_func']
-current_profile = current_func(dt*np.arange(current_dts), par['voltage_decay_const'])
-print(current_profile.shape)
+spikepulse_dts = par['num_spikepulse_timesteps']
+spikepulse_func= par['spikes_to_spikepulse_func']
+spikepulse_profile = spikepulse_func(dt * np.arange(spikepulse_dts), par['voltage_decay_const'])
+print(spikepulse_profile.shape)
 input_dts   = par['input_timesteps']
 V_in        = par['V_in']   # Neuron input voltage
 V_th        = par['V_th']
@@ -114,32 +114,26 @@ class LIFNeuron():
         if self.debug:
             print ('LIFNeuron(): Created {} neuron starting at time {}'.format(self.type, self.t))
 
-    def spike_generator(self, input, timestep, num):
+    def spike_generator(self, input, timestep):
         # Create local arrays for this run
 
         if timestep*dt > self.t_rest:
             specific_input = np.sum(input*self.connections)
             self.input[timestep] = specific_input
-            input_term = self.exc[3, timestep - 1] * specific_input * self.Rm
-            other_term = -self.V_m[timestep - 1] + self.exc[0, timestep - 1]
-            delta_V_m = self.V_m[timestep-1] + np.random.normal(0, voltage_stdev) + \
-                        (other_term + input_term) / self.tau_m * self.dt
-            if num == 29:
-                print("delta_V_m: {0}, input term: {1}, other term: {2}".format(delta_V_m, input_term, other_term))
             self.V_m[timestep] = self.V_m[timestep-1] + np.random.normal(0, voltage_stdev) +\
-                (-self.V_m[timestep-1] + self.exc[0,timestep-1] + self.exc[3,timestep-1]*specific_input*self.Rm) / self.tau_m * self.dt
+                (-self.V_m[timestep-1] + self.exc[0,timestep-1] + self.exc[3,timestep-1]*specific_input) / self.tau_m * self.dt
             self.exc[:, timestep] = self.exc_func(self.V_rest, self.V_th, self.tau_ref, self.gain,
                                       self.V_m[:timestep], self.spikes[:timestep], self.input[:timestep], self.exc[:,:timestep])
 
             if self.V_m[timestep] >= self.exc[1, timestep]:
                 self.spikes[timestep] += self.V_spike
                 try:
-                    self.output[timestep:timestep + current_dts] += current_profile
+                    self.output[timestep:timestep + spikepulse_dts] += spikepulse_profile
                     # self.output[timestep] = V_spike # TODO: change?
                 except:
                     if self.debug:
                         warn("self.output timestep ({}) out of current_profile range".format(timestep))
-                    self.output[timestep:] += current_profile[:dts - timestep]
+                    self.output[timestep:] += spikepulse_profile[:dts - timestep]
                     # self.output[timestep] = V_spike # TODO: change?
                 self.spiketimes.append(timestep * dt)
                 # if i+1 < spikes.shape[0]:
@@ -156,12 +150,12 @@ class LIFNeuron():
 
 # make a spike rate increase function and a spike rate decrease function I think
 # TODO: make exc function to increase V_th asymptotically,
-def exc_static_up_func(V_rest, V_th, tau_ref, gain, V_m, spikes, I, exc):
+def exc_static_up_func(V_rest, V_th, tau_ref, gain, V_m, spikes, input, exc):
     # make everything decay over time. rewrite this to be delta property?
 
     integrated_spikes = np.sum(spikes[-500:])
-    integrated_current = np.sum(I[-500:])
-    exc_rest = V_rest + integrated_current/2000
+    integrated_input = np.sum(input[-500:])
+    exc_rest = V_rest + integrated_input/2000
     exc_th = max(V_rest+5, V_th - integrated_spikes/50)
     exc_refrac = max(par['tau_abs_ref'], tau_ref - integrated_spikes*2.5)
     exc_gain = gain + integrated_spikes*2.5
@@ -188,7 +182,7 @@ for timestep in tqdm(np.arange(1, dts), desc="Calculating through timesteps"):
     for neuron in np.arange(num_neurons):
         full_input[num_inputs+neuron, timestep] = neurons[0][neuron].output[timestep-1]
     for neuron in np.arange(num_neurons):
-        neurons[0][neuron].spike_generator(full_input[:, timestep], timestep, neuron)
+        neurons[0][neuron].spike_generator(full_input[:, timestep], timestep)
 
 full_output = np.zeros((num_neurons, dts))
 for neuron in np.arange(num_neurons):
