@@ -20,3 +20,7 @@ def poisson_spikes(n_bins, fr = par['baseline_fr'], dt = par['simulation_dt'], r
         return spike_train
     else:
         return spike_train, bins_n
+
+def sigmoid(x):
+    y = 1/(1 + np.exp(-x))
+    return y

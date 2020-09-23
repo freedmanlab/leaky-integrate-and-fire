@@ -11,7 +11,7 @@ from warnings import warn
 from tqdm import tqdm
 from parameters_rlif_AS import par, update_dependencies
 
-from utils_rlif_AS import poisson_spikes
+from utils_rlif_AS import * # Currently: poisson_spikes, sigmoid
 
 T           = par['T']    # total time to simulate (ms)
 dt          = par['simulation_dt'] # Simulation timestep
@@ -19,7 +19,6 @@ dts         = par['timesteps']
 spikepulse_dts = par['num_spikepulse_timesteps']
 spikepulse_func= par['spikes_to_spikepulse_func']
 spikepulse_profile = spikepulse_func(dt * np.arange(spikepulse_dts), par['voltage_decay_const'])
-print(spikepulse_profile.shape)
 input_dts   = par['input_timesteps']
 V_in        = par['V_in']   # Neuron input voltage
 V_th        = par['V_th']
@@ -46,19 +45,19 @@ connections_mult_matrix[inhib_idxs] = -5 # WHY: -5?
 # Calculate inputs
 neuron_input = np.random.normal(0, input_stdev, (num_inputs, dts))
 for input_neuron in np.arange(num_inputs):
-    # Fixation
+    # Fixation, 300 ms
     neuron_input[input_neuron, poisson_spikes(n_bins = 300, fr = par['baseline_fr'], return_n_bin = True, n_bin_offset = 0)[1]] += abs(V_rest - V_th)
 
-    # First input
+    # First input, 200 ms
     neuron_input[input_neuron, poisson_spikes(n_bins = 200, fr = par['input_1_freq'], return_n_bin = True, n_bin_offset = 300)[1]] += abs(V_rest - V_th)
 
-    # Decay time
+    # Decay time, 500 ms
     neuron_input[input_neuron, poisson_spikes(n_bins = 500, fr = par['baseline_fr'], return_n_bin = True, n_bin_offset = 500)[1]] += abs(V_rest - V_th)
 
-    # Second input
+    # Second input, 200 ms
     neuron_input[input_neuron,  poisson_spikes(n_bins = 200, fr = par['input_2_freq'], return_n_bin = True, n_bin_offset = 1000)[1]] += abs(V_rest - V_th)
 
-    # End of trial
+    # End of trial, 800 ms
     neuron_input[input_neuron, poisson_spikes(n_bins = 800, fr = par['baseline_fr'], return_n_bin = True, n_bin_offset = 1200)[1]] += abs(V_rest - V_th)
 
 # generation of connectivity arrays
@@ -149,7 +148,6 @@ class LIFNeuron():
 # define resting excitability function - params are V_rest, V_m, spikes, I, exc
 
 # make a spike rate increase function and a spike rate decrease function I think
-# TODO: make exc function to increase V_th asymptotically,
 def exc_static_up_func(V_rest, V_th, tau_ref, gain, V_m, spikes, input, exc):
     # make everything decay over time. rewrite this to be delta property?
 
@@ -159,7 +157,46 @@ def exc_static_up_func(V_rest, V_th, tau_ref, gain, V_m, spikes, input, exc):
     exc_th = max(V_rest+5, V_th - integrated_spikes/50)
     exc_refrac = max(par['tau_abs_ref'], tau_ref - integrated_spikes*2.5)
     exc_gain = gain + integrated_spikes*2.5
-    return V_rest, V_th, tau_ref, gain
+    # return V_rest, V_th, tau_ref, gain
+    return exc_rest, exc_th, exc_refrac, exc_gain
+
+
+# Excitability function that decays over time. Changes come from spikes. Affects V_rest, V_th (?)
+def exc_variable_func(V_rest, V_th, tau_ref, gain, V_m, spikes, input, exc):
+    integrated_spikes = np.sum(spikes[-200:])
+    num_spikes = np.sum(spikes[-200:]) / V_spike
+    integrated_input = np.sum(input[-200:])
+
+    exc_rest = 10 * sigmoid(num_spikes - 20) + V_rest
+    # if exc_rest != -70:
+    #     print(exc_rest)
+    # this is crappy but bounds exc_rest: V_rest <= exc_rest <= exc_rest_max
+    if exc_rest < V_rest:
+        exc_rest = V_rest
+    elif exc_rest > par['exc_rest_max']:
+        exc_rest = par['exc_rest_max']
+
+    exc_th = -5 * sigmoid(num_spikes - 20) + V_th
+    # this is crappy but bounds exc_th: exc_thresh_min <= exc_th <= V_th
+    if exc_th < par['exc_thresh_min']:
+        exc_rest = par['exc_thresh_min']
+    elif exc_rest > V_th:
+        exc_rest = V_th
+
+    # exc_gain = gain + integrated_spikes*2.5
+    exc_refrac = -0.002 * sigmoid(num_spikes - 20) + tau_ref
+    # this is crappy but bounds exc_refrac: tau_abs_ref <= exc_refrac <= tau_ref
+    if exc_refrac < par['tau_abs_ref']:
+        exc_refrac = par['tau_abs_ref']
+    if exc_refrac > tau_ref:
+        exc_refrac = tau_ref
+
+
+    # TODO: Change
+    exc_gain = gain + num_spikes*2.5
+
+    return exc_rest, exc_th, exc_refrac, exc_gain
+
 
 # Create neuronal array
 def create_neurons(num_layers, num_neurons, debug=False, **specific_params):
@@ -173,12 +210,12 @@ def create_neurons(num_layers, num_neurons, debug=False, **specific_params):
         neurons.append(neuron_layer)
     return neurons
 
-neurons = create_neurons(num_layers, num_neurons, debug=False, exc_func = exc_static_up_func)
+neurons = create_neurons(num_layers, num_neurons, debug=False, exc_func = exc_variable_func)
 num_input_connected_neurons = np.sum([neurons[0][neuron].input_connected for neuron in np.arange(num_neurons)])
 
 full_input = np.zeros((num_inputs + num_neurons, dts))
 full_input[:num_inputs, :] = neuron_input
-for timestep in tqdm(np.arange(1, dts), desc="Calculating through timesteps"):
+for timestep in tqdm(np.arange(1, dts), desc="Calculating RNN spikes per timestep"):
     for neuron in np.arange(num_neurons):
         full_input[num_inputs+neuron, timestep] = neurons[0][neuron].output[timestep-1]
     for neuron in np.arange(num_neurons):
@@ -191,7 +228,6 @@ for neuron in np.arange(num_neurons):
 
 fig, axs = plt.subplots(2,1, sharex=True)
 # plt.get_current_fig_manager().window.showMaximized()
-# axs[0].set_xlim([0, T])
 for input_num in np.arange(num_inputs):
     axs[0].plot(time_range, full_input[input_num, :], 'b,')
 axs[0].axhline(par['V_th'], color='r')
@@ -205,8 +241,10 @@ neuron_colors = ['b'] * num_neurons
 neuron_colors[:num_input_connected_neurons] = ['r']*num_input_connected_neurons
 axs[1].eventplot(sorted_neuron_spiketimes, colors=neuron_colors)
 # axs[1].eventplot(neuron_spiketimes, colors=neuron_colors)
-axs[0].set_title('input')
-axs[1].set_title('output')
+axs[0].set_ylabel("Input Voltage (mV)")
+axs[1].set_ylabel("Output Spikes Per Neuron")
+axs[0].set_title('Input')
+axs[1].set_title('Output')
 
 fig2, axs2 = plt.subplots(2,1, sharex=True)
 # plt.get_current_fig_manager().window.showMaximized()
@@ -217,12 +255,27 @@ for neuron_num in np.arange(num_neurons):
         axs2[0].plot(time_range, neurons[0][neuron_num].input, linewidth=1)
     else:
         axs2[1].plot(time_range, neurons[0][neuron_num].input, linewidth=1)
-axs2[0].set_title('input connected')
-axs2[1].set_title('input not connected')
+axs2[0].set_ylabel("Input Voltage (\u0394 mV)")
+axs2[1].set_ylabel("Output Voltage (\u0394 mV)")
+axs2[0].set_title('Input connected')
+axs2[1].set_title('Input not connected')
 
 fig3, axs3 = plt.subplots(4,1, sharex=True)
+exc_labels = ["Resting Voltage (mV)", "Threshold Voltage (mV)", "Refractory Time (ms)", "Gain"]
 for exc_prop in np.arange(4):
     axs3[exc_prop].plot(time_range, neurons[0][0].exc[exc_prop,:])
-fig3.suptitle('Excitability properties')
+    axs3[exc_prop].set_xlabel(exc_labels[exc_prop])
+fig3.suptitle('Excitability Properties of Neuron 0')
 # plt.get_current_fig_manager().window.showMaximized()
+
+fig4, axs4 = plt.subplots(4, 1, sharex=True)
+exc_avg = np.zeros((4, dts))
+for timestep in tqdm(np.arange(dts), desc="Calculating averages for graphing"):
+    for exc_prop in np.arange(4):
+        exc_avg[exc_prop, timestep] = np.mean([neurons[0][neuron].exc[exc_prop, timestep] for neuron in np.arange(num_neurons)])
+for exc_prop in np.arange(4):
+    axs4[exc_prop].plot(time_range, exc_avg[exc_prop, :])
+    axs4[exc_prop].set_xlabel(exc_labels[exc_prop])
+fig4.suptitle('Average Network Excitability Properties')
+
 plt.show()
