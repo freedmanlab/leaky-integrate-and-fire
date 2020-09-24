@@ -170,26 +170,18 @@ def exc_variable_func(V_rest, V_th, tau_ref, gain, V_m, spikes, input, exc):
     exc_rest = 10 * sigmoid(num_spikes - 20) + V_rest
     # if exc_rest != -70:
     #     print(exc_rest)
-    # this is crappy but bounds exc_rest: V_rest <= exc_rest <= exc_rest_max
-    if exc_rest < V_rest:
-        exc_rest = V_rest
-    elif exc_rest > par['exc_rest_max']:
-        exc_rest = par['exc_rest_max']
+
+    #V_rest <= exc_rest <= exc_rest_max
+    exc_rest = min(max(exc_rest, V_rest), par['exc_rest_max'])
 
     exc_th = -5 * sigmoid(num_spikes - 20) + V_th
-    # this is crappy but bounds exc_th: exc_thresh_min <= exc_th <= V_th
-    if exc_th < par['exc_thresh_min']:
-        exc_rest = par['exc_thresh_min']
-    elif exc_rest > V_th:
-        exc_rest = V_th
+    #exc_thresh_min <= exc_th <= V_th
+    exc_th = min(max(exc_th, par['exc_thresh_min']), V_th)
 
     # exc_gain = gain + integrated_spikes*2.5
     exc_refrac = -0.002 * sigmoid(num_spikes - 20) + tau_ref
-    # this is crappy but bounds exc_refrac: tau_abs_ref <= exc_refrac <= tau_ref
-    if exc_refrac < par['tau_abs_ref']:
-        exc_refrac = par['tau_abs_ref']
-    if exc_refrac > tau_ref:
-        exc_refrac = tau_ref
+    #tau_abs_ref <= exc_refrac <= tau_ref
+    exc_refrac = min(max(exc_refrac, par['tau_abs_ref']), tau_ref)
 
 
     # TODO: Change
@@ -270,9 +262,8 @@ fig3.suptitle('Excitability Properties of Neuron 0')
 
 fig4, axs4 = plt.subplots(4, 1, sharex=True)
 exc_avg = np.zeros((4, dts))
-for timestep in tqdm(np.arange(dts), desc="Calculating averages for graphing"):
-    for exc_prop in np.arange(4):
-        exc_avg[exc_prop, timestep] = np.mean([neurons[0][neuron].exc[exc_prop, timestep] for neuron in np.arange(num_neurons)])
+for exc_prop in np.arange(4):
+    exc_avg[exc_prop, :] = np.mean([neuron.exc[exc_prop, :] for neuron in neurons[0]])
 for exc_prop in np.arange(4):
     axs4[exc_prop].plot(time_range, exc_avg[exc_prop, :])
     axs4[exc_prop].set_xlabel(exc_labels[exc_prop])
