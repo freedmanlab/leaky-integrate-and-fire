@@ -9,15 +9,16 @@ import random
 import matplotlib
 from warnings import warn
 from tqdm import tqdm
-from parameters_rlif_AS import par, update_dependencies
+from parameters_rlif_AS import par, update_dependencies, spikes_to_spikepulse
 
 from utils_rlif_AS import * # Currently: poisson_spikes, sigmoid
+from excitability_funcs import * # Currently: exc_static_up_func, exc_sigmoid_func, exc_sigmoid_timedep_func
 
 T           = par['T']    # total time to simulate (ms)
 dt          = par['simulation_dt'] # Simulation timestep
 dts         = par['timesteps']
 spikepulse_dts = par['num_spikepulse_timesteps']
-spikepulse_func= par['spikes_to_spikepulse_func']
+spikepulse_func= spikes_to_spikepulse
 spikepulse_profile = spikepulse_func(dt * np.arange(spikepulse_dts), par['voltage_decay_const'])
 input_dts   = par['input_timesteps']
 V_in        = par['V_in']   # Neuron input voltage
@@ -145,51 +146,6 @@ class LIFNeuron():
                             self.V_m[:timestep], self.spikes[:timestep], self.input[:timestep], self.exc[:,:timestep])
             self.V_m[timestep] = self.exc[0, timestep]
 
-# define resting excitability function - params are V_rest, V_m, spikes, I, exc
-
-# make a spike rate increase function and a spike rate decrease function I think
-def exc_static_up_func(V_rest, V_th, tau_ref, gain, V_m, spikes, input, exc):
-    # make everything decay over time. rewrite this to be delta property?
-
-    integrated_spikes = np.sum(spikes[-500:])
-    integrated_input = np.sum(input[-500:])
-    exc_rest = V_rest + integrated_input/2000
-    exc_th = max(V_rest+5, V_th - integrated_spikes/50)
-    exc_refrac = max(par['tau_abs_ref'], tau_ref - integrated_spikes*2.5)
-    exc_gain = gain + integrated_spikes*2.5
-    # return V_rest, V_th, tau_ref, gain
-    return exc_rest, exc_th, exc_refrac, exc_gain
-
-
-# Excitability function that decays over time. Changes come from spikes. Affects V_rest, V_th (?)
-def exc_variable_func(V_rest, V_th, tau_ref, gain, V_m, spikes, input, exc):
-    integrated_spikes = np.sum(spikes[-200:])
-    num_spikes = np.sum(spikes[-200:]) / V_spike
-    integrated_input = np.sum(input[-200:])
-
-    exc_rest = 10 * sigmoid(num_spikes - 20) + V_rest
-    # if exc_rest != -70:
-    #     print(exc_rest)
-
-    #V_rest <= exc_rest <= exc_rest_max
-    exc_rest = min(max(exc_rest, V_rest), par['exc_rest_max'])
-
-    exc_th = -5 * sigmoid(num_spikes - 20) + V_th
-    #exc_thresh_min <= exc_th <= V_th
-    exc_th = min(max(exc_th, par['exc_thresh_min']), V_th)
-
-    # exc_gain = gain + integrated_spikes*2.5
-    exc_refrac = -0.002 * sigmoid(num_spikes - 20) + tau_ref
-    #tau_abs_ref <= exc_refrac <= tau_ref
-    exc_refrac = min(max(exc_refrac, par['tau_abs_ref']), tau_ref)
-
-
-    # TODO: Change
-    exc_gain = gain + num_spikes*2.5
-
-    return exc_rest, exc_th, exc_refrac, exc_gain
-
-
 # Create neuronal array
 def create_neurons(num_layers, num_neurons, debug=False, **specific_params):
     neurons = []
@@ -202,7 +158,7 @@ def create_neurons(num_layers, num_neurons, debug=False, **specific_params):
         neurons.append(neuron_layer)
     return neurons
 
-neurons = create_neurons(num_layers, num_neurons, debug=False, exc_func = exc_variable_func)
+neurons = create_neurons(num_layers, num_neurons, debug=False, exc_func = exc_sigmoid_timedep_func)
 num_input_connected_neurons = np.sum([neurons[0][neuron].input_connected for neuron in np.arange(num_neurons)])
 
 full_input = np.zeros((num_inputs + num_neurons, dts))

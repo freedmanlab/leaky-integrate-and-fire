@@ -12,9 +12,6 @@ Independent parameters
 def default_exc_func(V_rest, V_th, tau_ref, gain, V_m, spikes, I, exc):
     return V_rest, V_th, tau_ref, gain
 
-def spikes_to_spikepulse(time, tau):
-    return 0.0101*(np.exp(-(time/(4*tau)))-np.exp(-(time/tau)))
-
 par = {
     # Setup parameters
     'save_dir'              : './savedir/',
@@ -42,7 +39,7 @@ par = {
     'exc_func'              : default_exc_func, # excitability function
     'input_stdev'           : 0.5,     # standard deviation of the input Gaussian noise; biological: idk, # TODO: Find out
     'voltage_stdev'         : 3,     # standard deviation of the neuron voltage update, also Gaussian; biological: idk # TODO: Find out
-    'spikes_to_spikepulse_func': spikes_to_spikepulse, # function for converting spikes to a pulse
+    # 'spikes_to_spikepulse_func': spikes_to_spikepulse, # function for converting spikes to a pulse
     'voltage_decay_const'   : .005,        # decay constant for the conversion from spikes to a pulse (ms)
     'decay_thresh'          : .0005,    # threshold for zeroing the current from a spike
 
@@ -61,8 +58,9 @@ par = {
     'input_2_freq'          : 100, # Frequency of the second input (Hz)
 
     # Excitability parameters
-    'exc_rest_max'          : -60, # maximum resting threshold (mV); biological: idk, # TODO: Find out
+    'exc_rest_max'          : -60, # maximum resting potential (mV); biological: idk, # TODO: Find out
     'exc_thresh_min'        : -60, # minumum threshold potential (mV); biological: idk, # TODO: Find out
+    'num_relevant_timebins' : 200, # number of time bins used to calculate excitability
 }
 
 def update_parameters(updates):
@@ -74,6 +72,9 @@ def update_parameters(updates):
 
     update_dependencies()
 
+def spikes_to_spikepulse(time, tau):
+    return 0.0101*(np.exp(-(time/(4*tau)))-np.exp(-(time/tau))) # * 1000 # convert to mV
+
 def update_dependencies():
     """ Updates all parameter dependencies """
     par['timesteps'] = int(par['T'] / par['simulation_dt'])
@@ -82,7 +83,7 @@ def update_dependencies():
     par['num_spikepulse_timesteps'] = compute_spikepulse_timesteps()
     par['exc_num'] = int(par['num_neurons'] * par['exc_prop'])
 
-def compute_spikepulse_timesteps():
+def compute_spikepulse_timesteps(): # Compute how long each spike pulse lasts. Assume it's less than 1000
     times = par['simulation_dt']*np.arange(1000)
     currents = spikes_to_spikepulse(times, par['voltage_decay_const'])
     return 1000-np.argmax(currents[::-1]>par['decay_thresh'])
