@@ -47,8 +47,14 @@ def exc_sigmoid_func(V_rest, V_th, tau_ref, gain, V_m, spikes, input, exc):
 
 def exc_sigmoid_timedep_func(V_rest, V_th, tau_ref, gain, V_m, spikes, input, exc):
     # Set weights of spikes based on time. Makes sure it is the same size as spikes at this timestep
-    timedep_spikeweights = np.arange(spikes[-par['num_relevant_timebins']:].shape[0]) / (spikes[-par['num_relevant_timebins']:].shape[0] / 2)
-
+    if par['timedep_scale'] == 'linear':
+        timedep_spikeweights = np.linspace(par['timedep_min_weight'], par['timedep_max_weight'], num = spikes[-par['num_relevant_timebins']:].shape[0])
+    elif par['timedep_scale'] == 'geometric' or par['timedep_scale'] == 'logarithmic':
+        # geomspace cannot contain 0
+        if par['timedep_min_weight'] == 0:
+            timedep_spikeweights = np.geomspace(par['timedep_max_weight'], par['timedep_max_weight'] * 2, num = spikes[-par['num_relevant_timebins']:].shape[0]) - par['timedep_max_weight']
+        else:
+            timedep_spikeweights = np.geomspace(par['timedep_min_weight'], par['timedep_max_weight'], num = spikes[-par['num_relevant_timebins']:].shape[0])
 
     integrated_spikes = np.sum(spikes[-par['num_relevant_timebins']:])
     num_spikes = np.sum(spikes[-par['num_relevant_timebins']:] * timedep_spikeweights)  / par['V_spike']

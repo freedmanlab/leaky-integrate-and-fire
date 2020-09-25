@@ -12,7 +12,7 @@ from tqdm import tqdm
 from parameters_rlif_AS import par, update_dependencies, spikes_to_spikepulse
 
 from utils_rlif_AS import * # Currently: poisson_spikes, sigmoid
-from excitability_funcs import * # Currently: exc_static_up_func, exc_sigmoid_func, exc_sigmoid_timedep_func
+from excitability_funcs_AS import * # Currently: exc_static_up_func, exc_sigmoid_func, exc_sigmoid_timedep_func
 
 T           = par['T']    # total time to simulate (ms)
 dt          = par['simulation_dt'] # Simulation timestep

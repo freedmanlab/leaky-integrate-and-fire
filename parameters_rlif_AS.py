@@ -61,6 +61,10 @@ par = {
     'exc_rest_max'          : -60, # maximum resting potential (mV); biological: idk, # TODO: Find out
     'exc_thresh_min'        : -60, # minumum threshold potential (mV); biological: idk, # TODO: Find out
     'num_relevant_timebins' : 200, # number of time bins used to calculate excitability
+
+    'timedep_scale'         : "geometric", # scale of time dependency for excitability. Options: linear, geometric (aka logarithmic)
+    'timedep_min_weight'    : 0, # the minimum weight of spikes, spikes farther away weighted less
+    'timedep_max_weight'    : 2, # the maximum weight of spikes, more recent spikes weighted up to this value. 2 is a good value, do not change
 }
 
 def update_parameters(updates):
