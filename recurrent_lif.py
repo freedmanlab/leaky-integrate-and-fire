@@ -30,12 +30,12 @@ num_inputs = par['num_inputs']
 num_exc = par['exc_num']
 connections_per_input = par['input_connected_num']//num_inputs
 
-np.random.seed(353)
+np.random.seed(727)
 
 
 
 #builds the connection matrix - each row is a neuron's INPUT
-#i.e. connections_ij > 0 -> neuron i connects to neuron j
+#i.e. connections_ij =/= 0 -> neuron i connects to neuron j
 connections = np.zeros((num_neurons, num_inputs+num_neurons))
 rng_matrix = np.random.uniform(size=(num_neurons, num_neurons))
 strength_matrix = np.random.uniform(.1, 1, size=(num_neurons, num_neurons))
@@ -56,7 +56,7 @@ connection_matrix = connections@connections_mult_matrix
 
 neuron_input = np.random.normal(0, input_stdev, (num_inputs, dts))
 for inpt in np.arange(num_inputs):
-    offset = np.random.randint(dts//10, dts // 3)
+    offset = np.random.randint(dts//10, 2*dts // 3)
     neuron_input[inpt, offset:offset + input_dts] += V_in
 
 
@@ -115,9 +115,15 @@ class LIFNeuron():
         self.V_rest   = specific_params.get("V_rest", par['V_rest'])    # resting potential (V)
         self.type     = par['type']
         self.debug    = par['debug']
-        self.exc_func = specific_params.get("exc_func", par["exc_func"])
         self.connections = connection_matrix[number, :]
         self.input_connected = np.any(self.connections[:num_inputs])
+
+        #excitability function parameters
+        self.exc_step_amts = specific_params.get("exc_step_amts", [0, 0, 0, 0])
+        self.exc_up = specific_params.get("exc_up", True)
+        self.exc_decay = specific_params.get("exc_decay", True)
+
+
 
         self.input = np.zeros(dts)
         self.output = np.zeros(dts)
@@ -140,8 +146,9 @@ class LIFNeuron():
             self.input[timestep] = specific_input
             self.V_m[timestep] = self.V_m[timestep-1] + np.random.normal(0, voltage_stdev) +\
                 (-self.V_m[timestep-1] + self.exc[0,timestep-1] + self.exc[3,timestep-1]*specific_input) / self.tau_m * self.dt
-            self.exc[:, timestep] = self.exc_func(self.V_rest, self.V_th, self.tau_ref, self.gain,
-                                      self.V_m[:timestep], self.spikes[:timestep], self.input[:timestep], self.exc[:,:timestep])
+            self.exc[:, timestep] = full_exc_func(self.V_rest, self.V_th, self.tau_ref, self.gain,
+                                      self.V_m[:timestep], self.spikes[:timestep], self.input[:timestep], self.exc[:,:timestep],
+                                        self.exc_step_amts, self.exc_up, self.exc_decay)
 
             if self.V_m[timestep] >= self.exc[1,timestep]:
                 self.spikes[timestep] += self.V_spike
@@ -157,38 +164,35 @@ class LIFNeuron():
                 if self.debug:
                     print ('*** LIFNeuron.spike_generator.spike=(self.t_rest={}, self.t={}, self.tau_ref={})'.format(self.t_rest, self.t, self.tau_ref))
         else:
-            self.exc[:, timestep] = self.exc_func(self.V_rest, self.V_th, self.tau_ref, self.gain,
-                            self.V_m[:timestep], self.spikes[:timestep], self.input[:timestep], self.exc[:,:timestep])
+            self.exc[:, timestep] = full_exc_func(self.V_rest, self.V_th, self.tau_ref, self.gain,
+                            self.V_m[:timestep], self.spikes[:timestep], self.input[:timestep], self.exc[:,:timestep],
+                            self.exc_step_amts, self.exc_up, self.exc_decay)
             self.V_m[timestep] = self.exc[0,timestep]
 
 # define resting excitability function - params are V_rest, V_m, spikes, I, exc
-
-#make a spike rate increase function and a spike rate decrease function I think
-def exc_static_up_func(V_rest, V_th, tau_ref, gain, V_m, spikes, input, exc):
-    #make everything decay over time. rewrite this to be delta property?
-
-    integrated_spikes = np.sum(spikes[-500:])
-    integrated_input = np.sum(input[-500:])
-    exc_rest = V_rest + integrated_input/2000
-    exc_th = max(V_rest+.001, V_th - integrated_spikes/50)
-    exc_refrac = max(par['tau_abs_ref'], tau_ref - integrated_spikes*2.5)
-    exc_gain = gain + integrated_spikes*2.5
-    return V_rest, V_th, tau_ref, gain
-
-def exc_static_down_func(V_rest, V_th, tau_ref, gain, V_m, spikes, input, exc):
-    return V_rest, V_th, tau_ref, gain
-
-def exc_decay_up_func(V_rest, V_th, tau_ref, gain, V_m, spikes, input, exc):
-    exc_rest = exc[0, -1] - (exc[0, -1]-V_rest)*dt/tau_exc
+def full_exc_func(V_rest, V_th, tau_ref, gain, V_m, spikes, input, exc, exc_step_amts, exc_up=True, decay=True):
+    if not exc_up:
+        exc_step_amts = [-x for x in exc_step_amts]
+    if decay:
+        exc_rest = exc[0, -1] - (exc[0, -1]-V_rest)*dt/tau_exc
+        exc_th = exc[1, -1] - (exc[1, -1]-V_th)*dt/tau_exc
+        exc_refrac = exc[2, -1] - (exc[2, -1]-tau_ref)*dt/tau_exc
+        exc_gain = exc[3, -1] - (exc[3, -1]-gain)*dt/tau_exc
     if spikes[-1] > 0:
-        exc_rest += .002
-    return exc_rest, V_th, tau_ref, gain
+        exc_rest += exc_step_amts[0]
+        exc_th -= exc_step_amts[1]
+        exc_refrac -= exc_step_amts[2]
+        exc_gain += exc_step_amts[3]
+    if not decay and spikes[-500] > 0:
+        exc_rest -= exc_step_amts[0]
+        exc_th += exc_step_amts[1]
+        exc_refrac += exc_step_amts[2]
+        exc_gain -= exc_step_amts[3]
+    exc_rest_final = min(exc_rest, exc_th)
+    exc_th_final = max(exc_rest, exc_th)
+    exc_refrac = max(exc_refrac, par['tau_abs_ref'])
+    return exc_rest_final, exc_th_final, exc_refrac, exc_gain
 
-def exc_decay_down_func(V_rest, V_th, tau_ref, gain, V_m, spikes, input, exc):
-    exc_rest = exc[0, -1] - (exc[0, -1]-V_rest)*dt/tau_exc
-    if spikes[-1] > 0:
-        exc_rest -= .005
-    return exc_rest, V_th, tau_ref, gain
 
 # Create neuronal array
 def add_neurons(num_neurons, neuron_list=[], debug=False, **specific_params):
@@ -197,8 +201,8 @@ def add_neurons(num_neurons, neuron_list=[], debug=False, **specific_params):
         neuron_list.append(LIFNeuron(i+num_prev_neurons, debug=debug, **specific_params))
     return neuron_list
 
-neurons_up = add_neurons(num_neurons//2, [], False, exc_func = exc_decay_up_func)
-neurons = add_neurons(num_neurons-num_neurons//2, neurons_up, debug=False, exc_func = exc_decay_down_func)
+neurons_up = add_neurons(num_neurons//2, [], False, exc_step_amts = [.001, .001, .1, .1], exc_up = True, exc_decay = True)
+neurons = add_neurons(num_neurons-num_neurons//2, neurons_up, debug=False, exc_step_amts = [.001, .001, .1, .1], exc_up=False, exc_decay=True )
 num_input_connected_neurons = np.sum([neurons[neuron].input_connected for neuron in np.arange(num_neurons)])
 
 full_input = np.zeros((num_inputs+num_neurons,dts))
