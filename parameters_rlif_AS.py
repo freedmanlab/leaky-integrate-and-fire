@@ -25,15 +25,15 @@ par = {
     'input_duration'        : 12.0,     # duration of the input current (s) # DEPRECATED
 
     'gain'                  : 1.0,      # neuron gain (unitless)
-    't_rest'                : 0.05,        # initial refractory time; biological: 1-2 ms
     'Rm'                    : 10,        # Resistance (MOhm); biological: ~10 MOhm
     'Cm'                    : .001,       # Capacitance (uF); biological: 0.9 uF
+    'tau_exc'               : .100,      # time constant for decay of exc properties (s), >> tau_m
     'tau_ref'               : 0.005,        # refractory period (s); biological: 3-5 ms
     'tau_abs_ref'           : 0.001,        # absolute refractory period (s), lower bound for exc_refrac
     'V_th'                  : -55,     # spike threshold (mV); biological: -55 mV
     'V_spike'               : 40,        # spike delta (mV); biological: 40 mV
     'V_rest'                : -70,        # resting potential (mV); biological: -70 mV
-    'V_hyperpolar'          : - 90,        # hyperpolarization potential (mV); biological: -90 mV
+    'V_hyperpolar'          : -90,        # hyperpolarization potential (mV); biological: -90 mV
     'type'                  : 'Leaky Integrate and Fire',
     'debug'                 : False,    # Watch neurons get made
     'exc_func'              : default_exc_func, # excitability function
@@ -47,22 +47,26 @@ par = {
     'num_layers'            : 1, # just one recurrent layer
     'num_neurons'           : 100,
     'num_inputs'            : 5,
-    'exc_prop'              : .8,     # proportion of neurons that are excitatory
+    'exc_prop'              : .7,     # proportion of neurons that are excitatory
     'input_connect_binary_prob': .3, # governs what fraction of neurons are connected to the inputs
     'input_connect_frac'    : .3, # governs how many inputs neurons that are connected to the inputs are connected to
     'recur_connect_frac'    : .3, # governs connections between neurons
+    'inhib_weight'          : -5, # value for weight of inhibitory neurons
 
-    # Memory firing rates
-    'baseline_fr'           : 3, # Baseline neuron firing rate (Hz); biological: 6-100 Hz
-    'input_1_freq'          : 10, # Frequency of the first input (Hz)
-    'input_2_freq'          : 100, # Frequency of the second input (Hz)
+    # Memory inputs
+    'baseline_fr'           : 3, # Baseline neuron firing rate (Hz); biological: 3-10 Hz (theta waves)
+    'theta_wave_freq'       : 6, # Frequency of the theta waves (Hz); biological: 6-10
+    'input_1_freq'          : 10, # Frequency of the first input (Hz) # place cells
+    'input_2_freq'          : 100, # Frequency of the second input (Hz) # grid cells
 
     # Excitability parameters
     'exc_rest_max'          : -60, # maximum resting potential (mV); biological: idk, # TODO: Find out
     'exc_thresh_min'        : -60, # minumum threshold potential (mV); biological: idk, # TODO: Find out
     'num_relevant_timebins' : 200, # number of time bins used to calculate excitability
 
-    'timedep_scale'         : "geometric", # scale of time dependency for excitability. Options: linear, geometric (aka logarithmic)
+    'spike_offset'          : 10, # By how much to shift excitability functions to the right
+
+    'timedep_scale'         : "linear", # scale of time dependency for excitability. Options: linear, geometric (aka logarithmic)
     'timedep_min_weight'    : 0, # the minimum weight of spikes, spikes farther away weighted less
     'timedep_max_weight'    : 2, # the maximum weight of spikes, more recent spikes weighted up to this value. 2 is a good value, do not change
 }
