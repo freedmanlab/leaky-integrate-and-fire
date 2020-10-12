@@ -16,6 +16,7 @@ par = {
     # Setup parameters
     'save_dir'              : './savedir/',
     'save_fn'               : 'model_results.pkl',
+    'set_seed'              : 42, # Random seed set for reproduction. Either numerical value or False
 
     ##################
     # Leaky intergrate and fire parameters
@@ -37,8 +38,8 @@ par = {
     'type'                  : 'Leaky Integrate and Fire',
     'debug'                 : False,    # Watch neurons get made
     'exc_func'              : default_exc_func, # excitability function
-    'input_stdev'           : 0.5,     # standard deviation of the input Gaussian noise; biological: idk, # TODO: Find out
-    'voltage_stdev'         : 3,     # standard deviation of the neuron voltage update, also Gaussian; biological: idk # TODO: Find out
+    'input_stdev'           : 3,     # standard deviation of the input Gaussian noise; biological: idk, # TODO: Find out. Should still be same as voltage stdev?
+    'voltage_stdev'         : 3,     # standard deviation of the neuron voltage update, also Gaussian; biological: 3-3.25 (Baroni et al., 2014)
     # 'spikes_to_spikepulse_func': spikes_to_spikepulse, # function for converting spikes to a pulse
     'voltage_decay_const'   : .005,        # decay constant for the conversion from spikes to a pulse (ms)
     'decay_thresh'          : .0005,    # threshold for zeroing the current from a spike
@@ -64,7 +65,7 @@ par = {
     'exc_thresh_min'        : -60, # minumum threshold potential (mV); biological: idk, # TODO: Find out
     'num_relevant_timebins' : 200, # number of time bins used to calculate excitability
 
-    'spike_offset'          : 10, # By how much to shift excitability functions to the right
+    'spike_offset'          : 10, # By how much to shift excitability functions to the right; 10 is a good value, shows spike trains
 
     'timedep_scale'         : "linear", # scale of time dependency for excitability. Options: linear, geometric (aka logarithmic)
     'timedep_min_weight'    : 0, # the minimum weight of spikes, spikes farther away weighted less

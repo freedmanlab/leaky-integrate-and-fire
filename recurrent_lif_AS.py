@@ -11,8 +11,8 @@ from warnings import warn
 from tqdm import tqdm
 from parameters_rlif_AS import par, update_dependencies, spikes_to_spikepulse
 
-from utils_rlif_AS import * # Currently: poisson_spikes, sigmoid, EEG_wave, gudermannian
-from excitability_funcs_AS import * # Currently: exc_static_up_func, exc_sigmoid_func, exc_sigmoid_timedep_func, exc_diff_timedep_func
+from utils_rlif_AS import EEG_wave
+from excitability_funcs_AS import exc_diff_timedep_func
 
 T           = par['T']    # total time to simulate (ms)
 dt          = par['simulation_dt'] # Simulation timestep
@@ -35,18 +35,16 @@ num_neurons = par['num_neurons']
 num_inputs  = par['num_inputs']
 num_exc     = par['exc_num']
 
-
-np.random.seed(42) # Set seed for reproduction
+if par['set_seed'] != False:
+    np.random.seed(par['set_seed'])
 
 # makes some neurons inhibitory
 inhib_idxs = np.random.choice(num_neurons, num_neurons - num_exc, replace = False) + num_inputs
 connections_mult_matrix = np.ones(num_inputs + num_neurons)
-connections_mult_matrix[inhib_idxs] = par['inhib_weight'] # WHY: -5?
+connections_mult_matrix[inhib_idxs] = par['inhib_weight']
 
 # Calculate inputs
 neuron_input = np.zeros((num_inputs, dts))
-# fig, axs = plt.subplots(num_inputs, 1, sharex=True)
-# TODO: Change to encoding different localizations, using place and grid cells. Different running speeds?
 for input_neuron in np.arange(num_inputs):
     # Fixation, 300 ms
     neuron_input[input_neuron, :300] += EEG_wave(n_bins = 300, frequency = par['theta_wave_freq'], n_bin_offset = 0)
@@ -64,10 +62,6 @@ for input_neuron in np.arange(num_inputs):
 
     # End of trial, 800 ms
     neuron_input[input_neuron, 1200:2000] += EEG_wave(n_bins = 800, frequency = par['theta_wave_freq'], n_bin_offset = 1200)
-
-#     axs[input_neuron].plot(time_range, neuron_input[input_neuron])
-#
-# plt.show()
 
 # generation of connectivity arrays
 def generate_connections(par):
@@ -186,14 +180,14 @@ axs[0].axhline(par['V_th'], color='r')
 for output_num in np.arange(num_neurons):
     axs[0].plot(time_range, neurons[0][output_num].V_m, ',')
 
-# graphed_neuron = np.random.choice(num_neurons)
-graphed_neuron = 93
+graphed_neuron = np.random.choice(np.arange(num_input_connected_neurons, num_neurons))
+# graphed_neuron = 93
 neuron_spiketimes = [neurons[0][neuron].spiketimes for neuron in np.arange(num_neurons)]
 neuron_input_connections = [neurons[0][neuron].input_connected for neuron in np.arange(num_neurons)]
 sorted_neuron_spiketimes = [spiketime for spiketime, tf in sorted(zip(neuron_spiketimes, neuron_input_connections), key=lambda neuron: neuron[1], reverse=True)]
 neuron_colors = ['b'] * num_neurons
 neuron_colors[:num_input_connected_neurons] = ['r']*num_input_connected_neurons
-neuron_colors[graphed_neuron] = 'y'
+neuron_colors[graphed_neuron] = 'lime'
 axs[1].eventplot(sorted_neuron_spiketimes, colors=neuron_colors)
 axs[0].set_ylabel("Input Voltage (mV)")
 axs[1].set_ylabel("Output Spikes Per Neuron")
@@ -219,7 +213,7 @@ for exc_prop in np.arange(4):
 axs3[0].set_ylim([V_rest - 2, par['exc_rest_max'] + 2])
 axs3[1].set_ylim([par['exc_thresh_min'] - 2, V_th + 2])
 axs3[2].set_ylim([par['tau_abs_ref'] - 0.002, par['tau_ref'] + 0.002])
-fig3.suptitle('Excitability Properties of Neuron {}'.format(graphed_neuron))
+fig3.suptitle('Excitability Properties of Neuron {}, {} spikes'.format(graphed_neuron, np.shape(sorted_neuron_spiketimes[graphed_neuron])[0]))
 
 """fig4, axs4 = plt.subplots(4, 1, sharex=True)
 exc_avg = np.zeros((4, dts))
@@ -229,11 +223,11 @@ for exc_prop in np.arange(4):
     axs4[exc_prop].set_title(exc_labels[exc_prop])
 fig4.suptitle('Average Network Excitability Properties')"""
 
-fig4, axs4 = plt.subplots(1, 1, sharex=True)
+"""fig4, axs4 = plt.subplots(1, 1, sharex=True)
 axs4.plot(time_range, neurons[0][graphed_neuron].V_m)
-fig4.suptitle('Membrane Potential of Neuron {}'.format(graphed_neuron))
-
-print(np.shape(neurons[0][graphed_neuron].spiketimes))
-print(np.count_nonzero(neurons[0][graphed_neuron].spikes))
+fig4.suptitle('Membrane Potential of Neuron {}'.format(graphed_neuron + num_input_connected_neurons))"""
 
 plt.show()
+
+# TODO: make legends
+# fix input voltage going down to -800 or explain

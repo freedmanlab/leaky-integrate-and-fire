@@ -29,7 +29,7 @@ def EEG_wave(n_bins, frequency = par['theta_wave_freq'], dt = par['simulation_dt
     y_offset = amplitude / 2
     for bin in np.arange(n_bins):
         value = amplitude * np.cos(2 * np.pi * frequency * (bin + n_bin_offset) * dt)
-        waveform[bin] = np.random.normal(value, par['voltage_stdev']) + y_offset # add in + np.random.normal(0,1)?
+        waveform[bin] = np.random.normal(value, par['input_stdev']) + y_offset 
     return waveform
 
 
