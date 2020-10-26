@@ -20,7 +20,7 @@ par = {
 
     ##################
     # Leaky intergrate and fire parameters
-    'T'                     : 2.0,       # total time to simulate (s)
+    'T'                     : 5.0,       # total time to simulate (s)
     'simulation_dt'         : 0.001,   # Simulation timestep (1 ms)
     'V_in'                  : -50,      # Neuron input voltage
     'input_duration'        : 12.0,     # duration of the input current (s) # DEPRECATED
@@ -52,7 +52,7 @@ par = {
     'input_connect_binary_prob': .3, # governs what fraction of neurons are connected to the inputs
     'input_connect_frac'    : .3, # governs how many inputs neurons that are connected to the inputs are connected to
     'recur_connect_frac'    : .3, # governs connections between neurons
-    'inhib_weight'          : -5, # value for weight of inhibitory neurons
+    'inhib_weight'          : -3, # value for weight of inhibitory neurons
 
     # Memory inputs
     'baseline_fr'           : 3, # Baseline neuron firing rate (Hz); biological: 3-10 Hz (theta waves)
@@ -70,6 +70,18 @@ par = {
     'timedep_scale'         : "linear", # scale of time dependency for excitability. Options: linear, geometric (aka logarithmic)
     'timedep_min_weight'    : 0, # the minimum weight of spikes, spikes farther away weighted less
     'timedep_max_weight'    : 2, # the maximum weight of spikes, more recent spikes weighted up to this value. 2 is a good value, do not change
+
+    'tau_exc_long'          : 0.5, # longer refractory time for excitability
+
+    'neurotransmitters'     : ['AMPA', 'NMDA', 'GABA'],
+
+    'AMPA_spikeoffset_short': 2, # spike offset for increasing probability of open AMPA receptors
+    'AMPA_spikeoffset_long' : 7, # spike offset for increasing density of AMPA receptors at membrane
+
+    'NMDA_offset_long'      : 12, # spike offset for increasing NMDA LTP
+
+    'GABA_spikeoffset_short': 2, # spike offset for increasing probability of open GABA receptors
+    'GABA_spikeoffset_long' : 7, # spike offset for increasing density of GABA receptors at membrane
 }
 
 def update_parameters(updates):
@@ -91,6 +103,7 @@ def update_dependencies():
     par['tau_m'] = par['Rm'] * par['Cm'] # Time constant
     par['num_spikepulse_timesteps'] = compute_spikepulse_timesteps()
     par['exc_num'] = int(par['num_neurons'] * par['exc_prop'])
+    par['neuron_receptor_weights'] = [(par['exc_prop'])/2, (par['exc_prop'])/2, 1-par['exc_prop']]
 
 def compute_spikepulse_timesteps(): # Compute how long each spike pulse lasts. Assume it's less than 1000
     times = par['simulation_dt']*np.arange(1000)

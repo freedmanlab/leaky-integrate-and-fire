@@ -207,14 +207,10 @@ def excitability_synaptic(V_rest, V_th, tau_ref, gain, V_m, spikes, input, exc, 
         exc_gain = gain + num_spikes*1 - (exc[3, -1] - gain) * dt / par['tau_exc_long']
 
 
-    exc_rest = min(max(exc_rest, V_rest), par['exc_rest_max'])
-    exc_th = min(max(exc_th, par['exc_thresh_min']), V_th)
-    exc_refrac = min(max(exc_refrac, par['tau_abs_ref']), tau_ref)
-
     # Add natural membrane noise
     exc_rest = exc_rest + np.random.normal(0, 0.5)
     exc_th = exc_th + np.random.normal(0, 0.25)
-    exc_refrac = exc_refrac + np.random.normal(0, 0.000125)
+    exc_refrac = tau_ref + np.random.normal(0, 0.000125)
     exc_gain = exc_gain + np.random.normal(0, 1.0)
 
     """exc_rest = V_rest

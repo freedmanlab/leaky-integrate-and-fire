@@ -65,7 +65,7 @@ for input_neuron in np.arange(num_inputs):
     neuron_input[input_neuron, 1000:1200] += EEG_wave(n_bins = 200, frequency = par['input_2_freq'], n_bin_offset = 1000)
 
     # End of trial, 800 ms
-    neuron_input[input_neuron, 1200:5000] += EEG_wave(n_bins = 3800, frequency = par['theta_wave_freq'], n_bin_offset = 1200)
+    neuron_input[input_neuron, 1200:2000] += EEG_wave(n_bins = 800, frequency = par['theta_wave_freq'], n_bin_offset = 1200)
 
 # generation of connectivity arrays
 def generate_connections(par):
@@ -196,8 +196,9 @@ sorted_neuron_spiketimes = [spiketime for spiketime, tf in sorted(zip(neuron_spi
 tau_ref_min = [min(neurons[0][neuron].exc[2, :]) for neuron in np.arange(num_neurons)]
 print(tau_ref_min)
 print(min(tau_ref_min))
+plt.plot(tau_ref_min)
 
-neuron_colors = ['b'] * num_neurons
+"""neuron_colors = ['b'] * num_neurons
 neuron_colors[:num_input_connected_neurons] = ['r']*num_input_connected_neurons
 neuron_colors[graphed_neuron] = 'lime'
 axs[1].eventplot(sorted_neuron_spiketimes, colors=neuron_colors)
@@ -276,7 +277,7 @@ fig6, axs6 = plt.subplots(1, 1, sharex=True)
 axs6.plot(time_range, neurons[0][graphed_neuron].V_m)
 fig6.suptitle('Membrane Potential of Neuron {}'.format(graphed_neuron))
 
-plt.show()
+plt.show()"""
 
 # TODO: make legends
 # fix input voltage going down to -800 or explain
