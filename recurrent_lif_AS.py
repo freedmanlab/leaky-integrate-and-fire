@@ -12,6 +12,10 @@ from warnings import warn
 from tqdm import tqdm
 from parameters_rlif_AS import par, update_dependencies, spikes_to_spikepulse
 
+import celluloid
+from datetime import datetime
+import time
+
 from utils_rlif_AS import EEG_wave
 from excitability_funcs_AS import exc_diff_timedep_func, excitability_synaptic
 
@@ -65,7 +69,7 @@ for input_neuron in np.arange(num_inputs):
     neuron_input[input_neuron, 1000:1200] += EEG_wave(n_bins = 200, frequency = par['input_2_freq'], n_bin_offset = 1000)
 
     # End of trial, 800 ms
-    neuron_input[input_neuron, 1200:5000] += EEG_wave(n_bins = 3800, frequency = par['theta_wave_freq'], n_bin_offset = 1200)
+    neuron_input[input_neuron, 1200:2000] += EEG_wave(n_bins = 800, frequency = par['theta_wave_freq'], n_bin_offset = 1200)
 
 # generation of connectivity arrays
 def generate_connections(par):
@@ -214,7 +218,7 @@ for neuron_num in np.arange(num_neurons):
     else:
         axs2[1].plot(time_range, neurons[0][neuron_num].input, linewidth=1)
 axs2[0].set_ylabel("Input Voltage (\u0394mV)")
-axs2[1].set_ylabel("Output Voltage (\u0394mV)")
+axs2[1].set_ylabel("Input Voltage (\u0394mV)")
 axs2[1].set_xlabel("Time, s")
 axs2[0].set_title('Input connected')
 axs2[1].set_title('Input not connected')
@@ -254,7 +258,7 @@ axs5[0].eventplot(sorted_neurotransmitter_spiketimes, colors = neurotransmitter_
 AMPA_patch = mpatches.Patch(color='blue', label='AMPA neurons')
 NMDA_patch = mpatches.Patch(color='green', label='NMDA neurons')
 GABA_patch = mpatches.Patch(color='yellow', label='GABA neurons')
-axs5[0].legend(handles = [AMPA_patch, NMDA_patch, GABA_patch], loc = 'upper right')
+axs5[0].legend(handles = [GABA_patch, NMDA_patch, AMPA_patch], loc = 'upper right')
 
 
 axs5[1].set_xlabel("Time, s")
@@ -262,7 +266,7 @@ axs5[1].eventplot(sorted_neuron_spiketimes, colors=neuron_colors)
 input_connected_patch = mpatches.Patch(color='red', label='Input Connected')
 input_not_connected_patch = mpatches.Patch(color='blue', label='Input Not Connected')
 graphed_neuron_patch = mpatches.Patch(color='lime', label='Graphed Neuron')
-axs5[1].legend(handles = [input_connected_patch, input_not_connected_patch, graphed_neuron_patch], loc = 'upper right')
+axs5[1].legend(handles = [input_not_connected_patch, input_connected_patch, graphed_neuron_patch], loc = 'upper right')
 
 
 axs5[0].set_ylabel("Neuron")
@@ -277,6 +281,36 @@ axs6.plot(time_range, neurons[0][graphed_neuron].V_m)
 fig6.suptitle('Membrane Potential of Neuron {}'.format(graphed_neuron))
 
 plt.show()
+"""
+# timesteps = 10
+timesteps = dts
 
-# TODO: make legends
-# fix input voltage going down to -800 or explain
+heatmap = np.zeros((timesteps, 3, 2, 10, 10))
+spikes = np.zeros((timesteps, 100))
+
+exc_labels = ["Spikes", "Null", "Resting Voltage (mV)", "Threshold Voltage (mV)", "Refractory Time (ms)", "Gain"]
+offsets = [V_rest, V_th, par['tau_ref'], 0]
+
+fig, axs = plt.subplots(3, 2)
+camera = celluloid.Camera(fig)
+
+for timestep in tqdm(np.arange(1, timesteps), desc = "Rendering"): # dts
+    spikes[timestep] = [neurons[0][neuron].spikes[timestep] / V_spike for neuron in np.arange(num_neurons)]
+
+    for row in np.arange(np.shape(axs)[0]):
+        for col in np.arange(np.shape(axs)[1]):
+            for i in np.arange(10):
+                for j in np.arange(10):
+                    if row == 0 and col == 0:
+                        heatmap[timestep][row][col][i][j] = spikes[timestep][i * 10 + j]
+                    elif row != 0:
+                        heatmap[timestep][row][col][i][j] = neurons[0][i * 10 + j].exc[row * 2 + col - 2, timestep] - offsets[row * 2 + col - 2]
+
+            axs[row][col].imshow(heatmap[timestep][row][col], cmap = 'hot', interpolation = 'nearest')
+            axs[row][col].set_title(exc_labels[row * 2 + col])
+    fig.suptitle('Frame {}'.format(timestep))
+    camera.snap()
+
+animation = camera.animate()
+animation.save('animations/animation {}.gif'.format(time.time()))
+"""

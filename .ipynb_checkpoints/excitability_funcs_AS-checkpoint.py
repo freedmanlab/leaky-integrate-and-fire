@@ -121,6 +121,7 @@ def exc_diff_timedep_func(V_rest, V_th, tau_ref, gain, V_m, spikes, input, exc):
     return exc_rest, exc_th, exc_refrac, exc_gain
 
 def excitability_synaptic(V_rest, V_th, tau_ref, gain, V_m, spikes, input, exc, neurotransmitter):
+    print("a")
 
     """
     Notes for this simulation of synaptic plasticity and excitability:
@@ -185,7 +186,7 @@ def excitability_synaptic(V_rest, V_th, tau_ref, gain, V_m, spikes, input, exc, 
 
         exc_th = -5 * sigmoid(num_spikes - par['NMDA_offset_long']) + V_th - (exc[1, -1] - V_th) * dt / par['tau_exc_long']
 
-        exc_refrac = -0.002 * sigmoid(num_spikes - par['AMPA_spikeoffset_long']) + tau_ref - (exc[2, -1] - tau_ref) * dt / par['tau_exc_long']
+        exc_refrac = -0.002 * sigmoid(num_spikes - par['NMDA_offset_long']) + tau_ref - (exc[2, -1] - tau_ref) * dt / par['tau_exc_long']
 
         exc_gain = gain + num_spikes*3 - (exc[3, -1] - gain) * dt / par['tau_exc_long']
     elif neurotransmitter == 'GABA':
@@ -207,15 +208,23 @@ def excitability_synaptic(V_rest, V_th, tau_ref, gain, V_m, spikes, input, exc, 
         exc_gain = gain + num_spikes*1 - (exc[3, -1] - gain) * dt / par['tau_exc_long']
 
 
+    exc_rest = min(max(exc_rest, V_rest), par['exc_rest_max'])
+    exc_th = min(max(exc_th, par['exc_thresh_min']), V_th)
+#     exc_refrac = min(max(exc_refrac, par['tau_abs_ref']), tau_ref)
+
     # Add natural membrane noise
-    exc_rest = exc_rest + np.random.normal(0, 0.5)
-    exc_th = exc_th + np.random.normal(0, 0.25)
+#     exc_rest = exc_rest + np.random.normal(0, 0.5)
+    exc_rest = V_rest + np.random.normal(0, 0.5)
+#     exc_th = exc_th + np.random.normal(0, 0.25)
+    exc_th = V_th + np.random.normal(0, 0.25)
+#     exc_refrac = exc_refrac + np.random.normal(0, 0.000125)
     exc_refrac = tau_ref + np.random.normal(0, 0.000125)
-    exc_gain = exc_gain + np.random.normal(0, 1.0)
+#     exc_gain = exc_gain + np.random.normal(0, 1.0)
+    exc_gain = gain + np.random.normal(0, 1.0)
 
     """exc_rest = V_rest
     exc_th = V_th
     exc_refrac = tau_ref
     exc_gain = gain"""
-
+    
     return exc_rest, exc_th, exc_refrac, exc_gain
