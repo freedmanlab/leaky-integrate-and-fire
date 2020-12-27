@@ -12,13 +12,17 @@ from warnings import warn
 from tqdm import tqdm
 from parameters_rlif_AS import par, update_dependencies, spikes_to_spikepulse
 
-import celluloid
-from datetime import datetime
-import time
-
 from utils_rlif_AS import EEG_wave
 from excitability_funcs_AS import exc_diff_timedep_func, excitability_synaptic
 
+"""
+avg_spikes = []
+std_spikes = []
+for iteration in tqdm(np.arange(16), desc="Iterations"):
+    print(iteration)
+    total_spikes = []
+    for loop in tqdm(np.arange(25), desc="Loops"):
+        print(loop)"""
 T           = par['T']    # total time to simulate (ms)
 dt          = par['simulation_dt'] # Simulation timestep
 dts         = par['timesteps']
@@ -43,13 +47,14 @@ num_exc     = par['exc_num']
 if par['set_seed'] != False:
     np.random.seed(par['set_seed'])
 
+iteration = 8 # 0 = all params on, 1 = no V_rest, 2 = no V_th, 4 = no t_ref, 8 = no gain
+
 # choose neurotransmiters for each neuron
 neurotransmitters = np.random.choice(par['neurotransmitters'], num_neurons, p = par['neuron_receptor_weights'])
 connections_mult_matrix = np.ones(num_inputs + num_neurons)
 for connection in np.arange(num_neurons):
     if neurotransmitters[connection] == 'GABA':
         connections_mult_matrix[connection] = par['inhib_weight']
-
 
 # Calculate inputs
 neuron_input = np.zeros((num_inputs, dts))
@@ -135,7 +140,7 @@ class LIFNeuron():
             self.V_m[timestep] = self.V_m[timestep-1] + np.random.normal(0, voltage_stdev) +\
                 (-self.V_m[timestep-1] + self.exc[0,timestep-1] + self.exc[3,timestep-1]*specific_input) / self.tau_m * self.dt
             self.exc[:, timestep] = self.exc_func(self.V_rest, self.V_th, self.tau_ref, self.gain,
-                                      self.V_m[:timestep], self.spikes[:timestep], self.input[:timestep], self.exc[:,:timestep], self.neurotransmitter)
+                                      self.V_m[:timestep], self.spikes[:timestep], self.input[:timestep], self.exc[:,:timestep], self.neurotransmitter, iteration)
 
             if self.V_m[timestep] >= self.exc[1, timestep]:
                 self.spikes[timestep] += self.V_spike
@@ -152,7 +157,7 @@ class LIFNeuron():
                     print ('*** LIFNeuron.spike_generator.spike=(self.t_rest={}, self.t={}, self.tau_ref={})'.format(self.t_rest, self.t, self.tau_ref))
         else:
             self.exc[:, timestep] = self.exc_func(self.V_rest, self.V_th, self.tau_ref, self.gain,
-                            self.V_m[:timestep], self.spikes[:timestep], self.input[:timestep], self.exc[:,:timestep], self.neurotransmitter)
+                            self.V_m[:timestep], self.spikes[:timestep], self.input[:timestep], self.exc[:,:timestep], self.neurotransmitter, iteration)
             self.V_m[timestep] = self.exc[0, timestep]
 
 # Create neuronal array
@@ -174,6 +179,7 @@ num_input_connected_neurons = np.sum([neurons[0][neuron].input_connected for neu
 full_input = np.zeros((num_inputs + num_neurons, dts))
 full_input[:num_inputs, :] = neuron_input
 for timestep in tqdm(np.arange(1, dts), desc="Calculating RNN spikes per timestep"):
+# for timestep in np.arange(1, dts):
     for neuron in np.arange(num_neurons):
         full_input[num_inputs+neuron, timestep] = neurons[0][neuron].output[timestep-1]
     for neuron in np.arange(num_neurons):
@@ -184,6 +190,169 @@ for neuron in np.arange(num_neurons):
     full_output[neuron, :] = neurons[0][neuron].V_m
 
 
+figsize = [9.5, 5]
+
+graphed_neuron = np.random.choice(np.arange(num_input_connected_neurons, num_neurons))
+graphed_neuron = 44
+sliding_window = 25 #ms
+
+
+spike_counts_nic = np.zeros((num_input_connected_neurons, dts - sliding_window)) # Input connected SMA
+spike_counts_nnc = np.zeros((num_neurons - num_input_connected_neurons, dts - sliding_window)) # Input not connected SMA
+
+for timestep in tqdm(np.arange(dts - sliding_window), desc = "generating SMAs"):
+    x = 0
+    y = 0
+    for neuron in np.arange(num_neurons):
+        if neurons[0][neuron].input_connected:
+            spike_counts_nic[x][timestep] = np.count_nonzero(neurons[0][neuron].spikes[timestep:timestep+ sliding_window])
+            x += 1
+        else:
+            spike_counts_nnc[y][timestep] = np.count_nonzero(neurons[0][neuron].spikes[timestep:timestep+ sliding_window])
+            y += 1
+
+spike_counts_nic_avg = np.mean(spike_counts_nic, axis = 0) / 0.025
+spike_counts_nnc_avg = np.mean(spike_counts_nnc, axis = 0) / 0.025
+
+fig, axs = plt.subplots(2, 1, sharex = True, figsize = figsize)
+axs[0].plot(spike_counts_nic_avg)
+axs[1].plot(spike_counts_nnc_avg)
+# axs[0].set_ylim(axs[1].get_ylim())
+axs[0].set_title("Average NIC Firing Rate", fontsize = 20)
+axs[0].set_ylabel("Firing Rate, Hz", fontsize = 16)
+axs[1].set_ylabel("Firing Rate, Hz", fontsize = 16)
+axs[1].set_title("Average NNC Firing Rate", fontsize = 20)
+axs[1].set_xlabel("Time, ms", fontsize = 16)
+axs[0].tick_params(axis = 'both', labelsize = 12)
+axs[1].tick_params(axis = 'both', labelsize = 12)
+plt.show()
+
+sliding_window = 50 #ms
+
+
+spike_counts_nic = np.zeros((num_input_connected_neurons, dts - sliding_window)) # Input connected SMA
+spike_counts_nnc = np.zeros((num_neurons - num_input_connected_neurons, dts - sliding_window)) # Input not connected SMA
+
+for timestep in tqdm(np.arange(dts - sliding_window), desc = "generating Fano Factors"):
+    x = 0
+    y = 0
+    for neuron in np.arange(num_neurons):
+        if neurons[0][neuron].input_connected:
+            spike_counts_nic[x][timestep] = np.count_nonzero(neurons[0][neuron].spikes[timestep:timestep+ sliding_window])
+            x += 1
+        else:
+            spike_counts_nnc[y][timestep] = np.count_nonzero(neurons[0][neuron].spikes[timestep:timestep+ sliding_window])
+            y += 1
+
+spike_counts_nic_avg = np.mean(spike_counts_nic, axis = 0)
+spike_counts_nnc_avg = np.mean(spike_counts_nnc, axis = 0)
+
+spike_counts_nic_avg = np.mean(spike_counts_nic, axis = 0)
+spike_counts_nnc_avg = np.mean(spike_counts_nnc, axis = 0)
+spike_counts_nic_var = np.var(spike_counts_nic, axis = 0)
+spike_counts_nnc_var = np.var(spike_counts_nic, axis = 0)
+fano_factor_nic = spike_counts_nic_var / spike_counts_nic_avg
+fano_factor_nnc = spike_counts_nnc_var / spike_counts_nnc_avg
+
+fig, axs = plt.subplots(2, 1, sharex = True, figsize = figsize)
+axs[0].plot(fano_factor_nic)
+axs[1].plot(fano_factor_nnc)
+axs[0].set_ylim(axs[1].get_ylim())
+axs[0].set_title("Average NIC Fano Factor", fontsize = 20)
+axs[0].set_ylabel("Spike Count", fontsize = 16)
+axs[1].set_ylabel("Spike Count", fontsize = 16)
+axs[1].set_title("Average NNC Fano Factor", fontsize = 20)
+axs[1].set_xlabel("Time, ms", fontsize = 16)
+axs[0].tick_params(axis = 'both', labelsize = 12)
+axs[1].tick_params(axis = 'both', labelsize = 12)
+plt.show()
+
+neuron_spiketimes = [neurons[0][neuron].spiketimes for neuron in np.arange(num_neurons)]
+neuron_input_connections = [neurons[0][neuron].input_connected for neuron in np.arange(num_neurons)]
+sorted_neuron_spiketimes = [spiketime for spiketime, tf in sorted(zip(neuron_spiketimes, neuron_input_connections), key=lambda neuron: neuron[1], reverse=True)]
+
+graphed_neuron = np.random.choice(np.arange(num_input_connected_neurons, num_neurons))
+print(graphed_neuron)
+
+graphed_neuron = 44
+
+fig3, axs3 = plt.subplots(4,1, sharex=True, figsize = figsize)
+exc_labels = ["Resting Voltage ($V_{rest}$)", "Threshold Voltage ($V_{th}$)", "Refractory Time ($\\tau_{ref}$)", "Gain ($\Gamma$)"]
+y_labels = ["mV", "mV", "sec", None]
+for exc_prop in np.arange(4):
+    axs3[exc_prop].plot(time_range, neurons[0][graphed_neuron].exc[exc_prop, :])
+    axs3[exc_prop].set_title(exc_labels[exc_prop], fontsize = 20)
+    axs3[exc_prop].set_ylabel(y_labels[exc_prop], fontsize = 16)
+axs3[0].set_ylim([V_rest - 2, par['exc_rest_max'] + 2])
+axs3[1].set_ylim([par['exc_thresh_min'] - 2, V_th + 2])
+axs3[2].set_ylim([par['tau_abs_ref'] - 0.002, par['tau_ref'] + 0.002])
+axs3[3].set_xlabel("Time, s", fontsize = 16)
+fig3.suptitle('Excitability Properties of Neuron {}, {} spikes'.format(graphed_neuron, np.shape(sorted_neuron_spiketimes[graphed_neuron])[0]), fontsize = 24)
+
+plt.show()
+
+
+sliding_window = 25 #ms
+
+sma_ic = np.zeros((num_input_connected_neurons, dts - sliding_window)) # Input connected SMA
+sma_nic = np.zeros((num_neurons - num_input_connected_neurons, dts - sliding_window)) # Input not connected SMA
+
+for timestep in tqdm(np.arange(dts - sliding_window), desc = "generating SMAs"):
+    x = 0
+    y = 0
+    for neuron in np.arange(num_neurons):
+        if neurons[0][neuron].input_connected:
+            sma_ic[x][timestep] = np.average(neurons[0][neuron].input[timestep:timestep+ sliding_window])
+            x += 1
+        else:
+            sma_nic[y][timestep] = np.average(neurons[0][neuron].input[timestep:timestep+ sliding_window])
+            y += 1
+
+sma_ic_avg = np.mean(sma_ic, axis = 0)
+sma_nic_avg = np.mean(sma_nic, axis = 0)
+
+fig1, axs1 = plt.subplots(2, 1, sharex = True, figsize = figsize)
+axs1[0].plot(sma_ic_avg)
+axs1[1].plot(sma_nic_avg)
+
+axs1[0].set_title("SMA of NIC Inputs", fontsize = 20)
+axs1[0].set_ylabel("\u0394mV", fontsize = 16)
+axs1[1].set_ylabel("\u0394mV", fontsize = 16)
+axs1[1].set_title("SMA of NNC Inputs", fontsize = 20)
+axs1[1].set_xlabel("Time, ms", fontsize = 16)
+axs1[0].tick_params(axis = 'both', labelsize = 12)
+axs1[1].tick_params(axis = 'both', labelsize = 12)
+plt.show()
+
+
+isis = []
+neuron = graphed_neuron
+print(len(neurons[0][neuron].spiketimes))
+for spiketime in np.arange(1, len(neurons[0][neuron].spiketimes)):
+    isis.append(neurons[0][neuron].spiketimes[spiketime] - neurons[0][neuron].spiketimes[spiketime-1])
+
+fig, axs = plt.subplots(1, 1, figsize = figsize)
+axs.set_ylabel("Number of Spikes", fontsize = 16)
+axs.set_xlabel("Interspike Interval, s", fontsize = 16)
+axs.hist(isis, bins = 50)
+axs.set_title("Interspike Intervals of Neuron {}, {} spikes".format(neuron, len(neurons[0][neuron].spiketimes)), fontsize = 20)
+axs.set_xlim((0, 0.2))
+axs.tick_params(axis = 'both', labelsize = 12)
+axs.tick_params(axis = 'both', labelsize = 12)
+plt.show()
+
+"""for neuron in np.arange(num_neurons):
+            total_spikes.append([len(neurons[0][neuron].spiketimes) for neuron in np.arange(num_neurons)])
+    print("total_spikes shape", np.shape(total_spikes), "should be (25, 100)")
+    avg_spikes.append(np.average(total_spikes))
+    std_spikes.append(np.std(total_spikes))
+    print(avg_spikes)
+    print(std_spikes)
+
+print("-----> DONE:")
+print(avg_spikes)
+print(std_spikes)"""
+
 fig, axs = plt.subplots(2,1, sharex=True)
 for input_num in np.arange(num_inputs):
     axs[0].plot(time_range, full_input[input_num, :], 'b,')
@@ -192,7 +361,7 @@ for output_num in np.arange(num_neurons):
     axs[0].plot(time_range, neurons[0][output_num].V_m, ',')
 
 graphed_neuron = np.random.choice(np.arange(num_input_connected_neurons, num_neurons))
-# graphed_neuron = 93
+graphed_neuron = 44
 neuron_spiketimes = [neurons[0][neuron].spiketimes for neuron in np.arange(num_neurons)]
 neuron_input_connections = [neurons[0][neuron].input_connected for neuron in np.arange(num_neurons)]
 sorted_neuron_spiketimes = [spiketime for spiketime, tf in sorted(zip(neuron_spiketimes, neuron_input_connections), key=lambda neuron: neuron[1], reverse=True)]
@@ -211,23 +380,33 @@ axs[1].set_xlabel("Time, s")
 axs[0].set_title('Input')
 axs[1].set_title('Output')
 
+axs[0].set_title("Input", fontsize = 20)
+axs[0].set_ylabel("Input Voltage (mV)", fontsize = 16)
+axs[1].set_ylabel("Firing Rate, Hz", fontsize = 16)
+axs[1].set_title("Output", fontsize = 20)
+axs[1].set_xlabel("Time, ms", fontsize = 16)
+axs[0].tick_params(axis = 'both', labelsize = 12)
+axs[1].tick_params(axis = 'both', labelsize = 12)
+
 fig2, axs2 = plt.subplots(2,1, sharex=True)
 for neuron_num in np.arange(num_neurons):
     if neurons[0][neuron_num].input_connected:
         axs2[0].plot(time_range, neurons[0][neuron_num].input, linewidth=1)
     else:
         axs2[1].plot(time_range, neurons[0][neuron_num].input, linewidth=1)
-axs2[0].set_ylabel("Input Voltage (\u0394mV)")
-axs2[1].set_ylabel("Input Voltage (\u0394mV)")
+axs2[0].set_ylabel("\u0394mV")
+axs2[1].set_ylabel("\u0394mV")
 axs2[1].set_xlabel("Time, s")
 axs2[0].set_title('Input connected')
 axs2[1].set_title('Input not connected')
 
 fig3, axs3 = plt.subplots(4,1, sharex=True)
-exc_labels = ["Resting Voltage (mV)", "Threshold Voltage (mV)", "Refractory Time (ms)", "Gain"]
+exc_labels = ["Resting Voltage ($V_{rest}$)", "Threshold Voltage ($V_{th}$)", "Refractory Time ($\\tau_{ref}$)", "Gain ($\Gamma$)"]
+y_labels = ["mV", "mV", "sec", None]
 for exc_prop in np.arange(4):
     axs3[exc_prop].plot(time_range, neurons[0][graphed_neuron].exc[exc_prop, :])
     axs3[exc_prop].set_title(exc_labels[exc_prop])
+    axs3[exc_prop].set_ylabel(y_labels[exc_prop])
 axs3[0].set_ylim([V_rest - 2, par['exc_rest_max'] + 2])
 axs3[1].set_ylim([par['exc_thresh_min'] - 2, V_th + 2])
 axs3[2].set_ylim([par['tau_abs_ref'] - 0.002, par['tau_ref'] + 0.002])
@@ -243,7 +422,7 @@ for exc_prop in np.arange(4):
 axs4[3].set_xlabel("Time, s")
 fig4.suptitle('Average Network Excitability Properties')
 
-fig5, axs5 = plt.subplots(2, 1, sharex=True)
+fig5, axs5 = plt.subplots(2, 1, sharex=True, figsize = figsize)
 sorted_neurotransmitter_spiketimes = [spiketime for spiketime, tf in sorted(zip(neuron_spiketimes, neurotransmitters), key=lambda neuron: neuron[1], reverse=True)]
 num_AMPA = np.count_nonzero(neurotransmitters == "AMPA")
 num_NMDA = np.count_nonzero(neurotransmitters == "NMDA")
@@ -261,7 +440,7 @@ GABA_patch = mpatches.Patch(color='yellow', label='GABA neurons')
 axs5[0].legend(handles = [GABA_patch, NMDA_patch, AMPA_patch], loc = 'upper right')
 
 
-axs5[1].set_xlabel("Time, s")
+axs5[1].set_xlabel("Time, s", fontsize = 16)
 axs5[1].eventplot(sorted_neuron_spiketimes, colors=neuron_colors)
 input_connected_patch = mpatches.Patch(color='red', label='Input Connected')
 input_not_connected_patch = mpatches.Patch(color='blue', label='Input Not Connected')
@@ -269,12 +448,18 @@ graphed_neuron_patch = mpatches.Patch(color='lime', label='Graphed Neuron')
 axs5[1].legend(handles = [input_not_connected_patch, input_connected_patch, graphed_neuron_patch], loc = 'upper right')
 
 
-axs5[0].set_ylabel("Neuron")
-axs5[1].set_ylabel("Neuron")
-axs5[1].set_xlabel("Time, s")
-axs5[0].set_title('Output Spikes Per Neuron, Neurotransmitters')
-axs5[1].set_title('Output Spikes Per Neuron, Input Connected')
-fig5.suptitle('Sorted Neuronal Spikes')
+axs5[0].set_title("Output Spikes per Neuron, Neurotransmitters", fontsize = 20)
+axs5[0].set_ylabel("Neuron", fontsize = 16)
+axs5[1].set_ylabel("Neuron", fontsize = 16)
+axs5[1].set_title("Output Spikes per Neuron, Input Connected", fontsize = 20)
+axs5[1].set_xlabel("Time, s", fontsize = 16)
+axs5[0].tick_params(axis = 'both', labelsize = 12)
+axs5[1].tick_params(axis = 'both', labelsize = 12)
+fig5.suptitle('Sorted Neuronal Spikes', fontsize = 24)
+axs5[0].tick_params(axis = 'both', labelsize = 12)
+axs5[1].tick_params(axis = 'both', labelsize = 12)
+
+plt.show()
 
 fig6, axs6 = plt.subplots(1, 1, sharex=True)
 axs6.plot(time_range, neurons[0][graphed_neuron].V_m)
@@ -313,4 +498,5 @@ for timestep in tqdm(np.arange(1, timesteps), desc = "Rendering"): # dts
 
 animation = camera.animate()
 animation.save('animations/animation {}.gif'.format(time.time()))
+
 """

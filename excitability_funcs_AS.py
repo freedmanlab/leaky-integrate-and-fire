@@ -120,9 +120,7 @@ def exc_diff_timedep_func(V_rest, V_th, tau_ref, gain, V_m, spikes, input, exc):
 
     return exc_rest, exc_th, exc_refrac, exc_gain
 
-def excitability_synaptic(V_rest, V_th, tau_ref, gain, V_m, spikes, input, exc, neurotransmitter):
-    print("a")
-
+def excitability_synaptic(V_rest, V_th, tau_ref, gain, V_m, spikes, input, exc, neurotransmitter, iteration):
     """
     Notes for this simulation of synaptic plasticity and excitability:
     Can simulate a bunch of channels. Which ones to simulate?
@@ -212,19 +210,40 @@ def excitability_synaptic(V_rest, V_th, tau_ref, gain, V_m, spikes, input, exc, 
     exc_th = min(max(exc_th, par['exc_thresh_min']), V_th)
 #     exc_refrac = min(max(exc_refrac, par['tau_abs_ref']), tau_ref)
 
+#     # Add natural membrane noise
+#     exc_rest = exc_rest + np.random.normal(0, 0.5)
+# #     exc_rest = V_rest + np.random.normal(0, 0.5)
+#     exc_th = exc_th + np.random.normal(0, 0.25)
+# #     exc_th = V_th + np.random.normal(0, 0.25)
+#     exc_refrac = exc_refrac + np.random.normal(0, 0.000125)
+# #     exc_refrac = tau_ref + np.random.normal(0, 0.000125)
+#     exc_gain = exc_gain + np.random.normal(0, 1.0)
+# #     exc_gain = gain + np.random.normal(0, 1.0)
+
     # Add natural membrane noise
-    exc_rest = exc_rest + np.random.normal(0, 0.5)
-#     exc_rest = V_rest + np.random.normal(0, 0.5)
-    exc_th = exc_th + np.random.normal(0, 0.25)
-#     exc_th = V_th + np.random.normal(0, 0.25)
-    exc_refrac = exc_refrac + np.random.normal(0, 0.000125)
-#     exc_refrac = tau_ref + np.random.normal(0, 0.000125)
-    exc_gain = exc_gain + np.random.normal(0, 1.0)
-#     exc_gain = gain + np.random.normal(0, 1.0)
+    if iteration % 2  == 0:
+        exc_rest = exc_rest + np.random.normal(0, 0.5)
+    else:
+        exc_rest = V_rest + np.random.normal(0, 0.5)
+
+    if iteration % 4 < 2:
+        exc_th = exc_th + np.random.normal(0, 0.25)
+    else:
+        exc_th = V_th + np.random.normal(0, 0.25)
+
+    if iteration % 8 < 4:
+        exc_refrac = exc_refrac + np.random.normal(0, 0.000125)
+    else:
+        exc_refrac = tau_ref + np.random.normal(0, 0.000125)
+
+    if iteration < 8:
+        exc_gain = exc_gain + np.random.normal(0, 1.0)
+    else:
+        exc_gain = gain + np.random.normal(0, 1.0)
 
     """exc_rest = V_rest
     exc_th = V_th
     exc_refrac = tau_ref
     exc_gain = gain"""
-    
+
     return exc_rest, exc_th, exc_refrac, exc_gain

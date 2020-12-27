@@ -16,7 +16,7 @@ par = {
     # Setup parameters
     'save_dir'              : './savedir/',
     'save_fn'               : 'model_results.pkl',
-    'set_seed'              : False, # Random seed set for reproduction. Either numerical value or False
+    'set_seed'              : 42, # Random seed set for reproduction. Either numerical value or False
 
     ##################
     # Leaky intergrate and fire parameters
