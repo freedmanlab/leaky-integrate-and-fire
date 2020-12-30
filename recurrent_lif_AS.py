@@ -2,6 +2,8 @@
 Antony Simonoff, Adam Fine. 2020
 '''
 
+import sys
+
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.patches as mpatches
@@ -47,7 +49,22 @@ num_exc     = par['exc_num']
 if par['set_seed'] != False:
     np.random.seed(par['set_seed'])
 
-iteration = 8 # 0 = all params on, 1 = no V_rest, 2 = no V_th, 4 = no t_ref, 8 = no gain
+if len(sys.argv) > 1:
+    try:
+        iteration = int(sys.argv[1])
+    except:
+        if sys.argv[1] == 'V_rest':
+            iteration = 1
+        elif sys.argv[1] == 'V_th':
+            iteration = 2
+        elif sys.argv[1] == 't_ref':
+            iteration = 4
+        elif sys.argv[1] == 'gain':
+            iteration = 8
+        else:
+            print("Iteration requires an int or valid trial to exclude")
+else:
+    iteration = 0 # 0 = all params on, 1 = no V_rest, 2 = no V_th, 4 = no t_ref, 8 = no gain
 
 # choose neurotransmiters for each neuron
 neurotransmitters = np.random.choice(par['neurotransmitters'], num_neurons, p = par['neuron_receptor_weights'])
@@ -197,7 +214,7 @@ graphed_neuron = 44
 sliding_window = 25 #ms
 
 
-spike_counts_nic = np.zeros((num_input_connected_neurons, dts - sliding_window)) # Input connected SMA
+"""spike_counts_nic = np.zeros((num_input_connected_neurons, dts - sliding_window)) # Input connected SMA
 spike_counts_nnc = np.zeros((num_neurons - num_input_connected_neurons, dts - sliding_window)) # Input not connected SMA
 
 for timestep in tqdm(np.arange(dts - sliding_window), desc = "generating SMAs"):
@@ -225,7 +242,7 @@ axs[1].set_title("Average NNC Firing Rate", fontsize = 20)
 axs[1].set_xlabel("Time, ms", fontsize = 16)
 axs[0].tick_params(axis = 'both', labelsize = 12)
 axs[1].tick_params(axis = 'both', labelsize = 12)
-plt.show()
+plt.show()"""
 
 sliding_window = 50 #ms
 
@@ -259,15 +276,15 @@ axs[0].plot(fano_factor_nic)
 axs[1].plot(fano_factor_nnc)
 axs[0].set_ylim(axs[1].get_ylim())
 axs[0].set_title("Average NIC Fano Factor", fontsize = 20)
-axs[0].set_ylabel("Spike Count", fontsize = 16)
-axs[1].set_ylabel("Spike Count", fontsize = 16)
+axs[0].set_ylabel("Fanor Factor", fontsize = 16)
+axs[1].set_ylabel("Fanor Factor", fontsize = 16)
 axs[1].set_title("Average NNC Fano Factor", fontsize = 20)
 axs[1].set_xlabel("Time, ms", fontsize = 16)
 axs[0].tick_params(axis = 'both', labelsize = 12)
 axs[1].tick_params(axis = 'both', labelsize = 12)
 plt.show()
 
-neuron_spiketimes = [neurons[0][neuron].spiketimes for neuron in np.arange(num_neurons)]
+"""neuron_spiketimes = [neurons[0][neuron].spiketimes for neuron in np.arange(num_neurons)]
 neuron_input_connections = [neurons[0][neuron].input_connected for neuron in np.arange(num_neurons)]
 sorted_neuron_spiketimes = [spiketime for spiketime, tf in sorted(zip(neuron_spiketimes, neuron_input_connections), key=lambda neuron: neuron[1], reverse=True)]
 
@@ -341,7 +358,7 @@ axs.tick_params(axis = 'both', labelsize = 12)
 axs.tick_params(axis = 'both', labelsize = 12)
 plt.show()
 
-"""for neuron in np.arange(num_neurons):
+for neuron in np.arange(num_neurons):
             total_spikes.append([len(neurons[0][neuron].spiketimes) for neuron in np.arange(num_neurons)])
     print("total_spikes shape", np.shape(total_spikes), "should be (25, 100)")
     avg_spikes.append(np.average(total_spikes))
@@ -353,7 +370,7 @@ print("-----> DONE:")
 print(avg_spikes)
 print(std_spikes)"""
 
-fig, axs = plt.subplots(2,1, sharex=True)
+"""fig, axs = plt.subplots(2,1, sharex=True)
 for input_num in np.arange(num_inputs):
     axs[0].plot(time_range, full_input[input_num, :], 'b,')
 axs[0].axhline(par['V_th'], color='r')
@@ -465,7 +482,7 @@ fig6, axs6 = plt.subplots(1, 1, sharex=True)
 axs6.plot(time_range, neurons[0][graphed_neuron].V_m)
 fig6.suptitle('Membrane Potential of Neuron {}'.format(graphed_neuron))
 
-plt.show()
+plt.show()"""
 """
 # timesteps = 10
 timesteps = dts
